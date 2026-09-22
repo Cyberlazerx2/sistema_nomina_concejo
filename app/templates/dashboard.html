@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Panel Principal</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #ecf0f1; margin: 0; padding: 20px; }
+        .header { background: white; padding: 20px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .btn-logout { background-color: #e74c3c; color: white; padding: 8px 15px; text-decoration: none; border-radius: 4px; font-weight: bold; }
+        .card { background: white; padding: 20px; margin-top: 20px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .tag-rol { background: #2980b9; color: white; padding: 4px 8px; border-radius: 4px; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>Panel de Control - Concejo Municipal</h2>
+        <div>
+            Usuario: <strong>{{ usuario }}</strong> | Rol: <span class="tag-rol">{{ rol }}</span>
+            <a href="{{ url_for('auth.logout') }}" class="btn-logout" style="margin-left: 15px;">Cerrar Sesión</a>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>Sesión iniciada con éxito</h3>
+        <p>Tu rol detectado desde la base de datos es: <strong>{{ rol }}</strong>.</p>
+        <p>A partir de aquí estructuraremos el motor de cálculo y las vistas de pre-nómina según tus permisos.</p>
+    </div>
+</body>
+</html>
