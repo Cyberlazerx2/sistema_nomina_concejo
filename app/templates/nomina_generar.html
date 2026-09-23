@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Pre-cálculo de Nómina - Concejo Municipal</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); margin-bottom: 20px; }
+        h2, h3 { color: #2c3e50; margin-top: 0; }
+        .form-row { display: flex; gap: 15px; margin-bottom: 15px; }
+        .form-group { flex: 1; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 13px; color: #444; }
+        input, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .btn { padding: 10px 18px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; text-decoration: none; display: inline-block; }
+        .btn-primary { background: #0056b3; color: white; }
+        .btn-success { background: #28a745; color: white; font-size: 15px; }
+        .btn-secondary { background: #6c757d; color: white; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #2c3e50; color: white; }
+        .text-right { text-align: right; }
+        .alert { padding: 10px; border-radius: 4px; margin-bottom: 15px; }
+        .alert-success { background-color: #d4edda; color: #155724; }
+        .alert-warning { background-color: #fff3cd; color: #856404; }
+        .alert-danger { background-color: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h2>Módulo de Elaboración de Nómina</h2>
+            <div>
+                <a href="{{ url_for('nomina.historial') }}" class="btn btn-secondary">Ver Historial</a>
+                <a href="{{ url_for('auth.dashboard') }}" class="btn btn-secondary">Regresar al Panel</a>
+            </div>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="card">
+            <h3>Parámetros del Periodo Quincenal</h3>
+            <form method="POST" action="{{ url_for('nomina.generar') }}">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Tipo de Nómina Institucional:</label>
+                        <select name="tipo_personal" required>
+                            {% for codigo, nombre in tipos_nomina %}
+                                <option value="{{ codigo }}" {% if parametros and parametros.tipo_personal == codigo %}selected{% endif %}>{{ nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Descripción del Periodo:</label>
+                        <input type="text" name="descripcion" value="{{ parametros.descripcion if parametros else '1ra Quincena Octubre 2026' }}" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Fecha de Inicio:</label>
+                        <input type="date" name="fecha_inicio" value="{{ parametros.fecha_inicio if parametros else '2026-10-01' }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Fecha de Fin:</label>
+                        <input type="date" name="fecha_fin" value="{{ parametros.fecha_fin if parametros else '2026-10-15' }}" required>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Ejecutar Pre-cálculo</button>
+
+                {% if resultados %}
+                    <button type="submit" name="confirmar_guardar" value="1" class="btn btn-success" style="margin-left: 10px;">
+                        Guardar Pre-nómina (Estado Borrador)
+                    </button>
+                {% endif %}
+            </form>
+        </div>
+
+        {% if resultados %}
+        <div class="card">
+            <h3>Vista Previa del Pre-cálculo (Simulación)</h3>
+            <p><strong>Total Asignaciones:</strong> Bs. {{ parametros.total_asig }} | 
+               <strong>Total Deducciones de Ley:</strong> Bs. {{ parametros.total_ded }} | 
+               <strong>Neto a Dispersar:</strong> <span style="color: #27ae60; font-size: 16px;">Bs. {{ parametros.total_neto }}</span></p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Cédula</th>
+                        <th>Trabajador</th>
+                        <th class="text-right">Asignaciones</th>
+                        <th class="text-right">Deducciones</th>
+                        <th class="text-right">Neto a Cobrar</th>
+                        <th>Desglose de Conceptos</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in resultados %}
+                    <tr>
+                        <td>{{ r.cedula }}</td>
+                        <td><strong>{{ r.nombre_completo }}</strong></td>
+                        <td class="text-right">Bs. {{ r.total_asignaciones }}</td>
+                        <td class="text-right" style="color: #c0392b;">Bs. {{ r.total_deducciones }}</td>
+                        <td class="text-right" style="color: #27ae60; font-weight: bold;">Bs. {{ r.neto_pagar }}</td>
+                        <td>
+                            <ul style="margin: 0; padding-left: 15px; font-size: 11px;">
+                                {% for d in r.detalles %}
+                                    <li>{{ d.descripcion }}: Bs. {{ d.monto }}</li>
+                                {% endfor %}
+                            </ul>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

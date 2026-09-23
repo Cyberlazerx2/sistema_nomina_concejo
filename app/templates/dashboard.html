@@ -2,13 +2,25 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Panel Principal</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Control - Concejo Municipal</title>
     <style>
         body { font-family: Arial, sans-serif; background-color: #ecf0f1; margin: 0; padding: 20px; }
         .header { background: white; padding: 20px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         .btn-logout { background-color: #e74c3c; color: white; padding: 8px 15px; text-decoration: none; border-radius: 4px; font-weight: bold; }
-        .card { background: white; padding: 20px; margin-top: 20px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .tag-rol { background: #2980b9; color: white; padding: 4px 8px; border-radius: 4px; font-size: 13px; }
+        .card { background: white; padding: 25px; margin-top: 20px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .tag-rol { background: #2980b9; color: white; padding: 4px 8px; border-radius: 4px; font-size: 13px; text-transform: uppercase; }
+        .menu-grid { display: flex; gap: 15px; margin-top: 20px; flex-wrap: wrap; }
+        .menu-btn { display: inline-block; padding: 12px 20px; border-radius: 5px; color: white; text-decoration: none; font-weight: bold; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .btn-analista { background-color: #0056b3; }
+        .btn-directora { background-color: #27ae60; }
+        .btn-presidente { background-color: #8e44ad; }
+        .btn-historial { background-color: #34495e; }
+        .menu-btn:hover { opacity: 0.9; }
+        .alert { padding: 10px; border-radius: 4px; margin-bottom: 15px; font-size: 13px; }
+        .alert-success { background-color: #d4edda; color: #155724; }
+        .alert-warning { background-color: #fff3cd; color: #856404; }
+        .alert-danger { background-color: #f8d7da; color: #721c24; }
     </style>
 </head>
 <body>
@@ -20,10 +32,70 @@
         </div>
     </div>
 
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}" style="margin-top: 20px;">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
     <div class="card">
-        <h3>Sesión iniciada con éxito</h3>
-        <p>Tu rol detectado desde la base de datos es: <strong>{{ rol }}</strong>.</p>
-        <p>A partir de aquí estructuraremos el motor de cálculo y las vistas de pre-nómina según tus permisos.</p>
+        <h3>Bandeja Operativa</h3>
+        <p>Bienvenido al módulo de gestión. Su perfil institucional activo es: <strong>{{ rol }}</strong>.</p>
+
+        <!-- Opciones para Analista de RRHH -->
+        {% if rol == 'analista_rrhh' %}
+            <div class="menu-grid">
+                <a href="{{ url_for('nomina.generar') }}" class="menu-btn btn-analista">
+                    📋 Elaborar y Precalcular Nómina Quincenal
+                </a>
+                <a href="{{ url_for('nomina.historial') }}" class="menu-btn btn-historial">
+                    📂 Consultar Historial de Periodos
+                </a>
+            </div>
+
+        <!-- Opciones para Directora de RRHH -->
+        {% elif rol == 'directora_rrhh' %}
+            <div class="menu-grid">
+                <a href="{{ url_for('nomina.generar') }}" class="menu-btn btn-analista">
+                    📋 Elaborar Pre-nómina (Excepcional)
+                </a>
+                <a href="{{ url_for('nomina.historial') }}" class="menu-btn btn-directora">
+                    🔍 Revisar Nóminas Pendientes y Validar
+                </a>
+                <a href="{{ url_for('nomina.historial') }}" class="menu-btn btn-presidente">
+                    📥 Dispersión Bancaria (Exportar TXT Patria)
+                </a>
+            </div>
+
+        <!-- Opciones para Presidente del Concejo -->
+        {% elif rol == 'presidente' %}
+            <div class="menu-grid">
+                <a href="{{ url_for('nomina.historial') }}" class="menu-btn btn-presidente">
+                    🔒 Bandeja de Aprobación Institucional de Nóminas
+                </a>
+            </div>
+
+        <!-- Opciones para Trabajador Regular -->
+        {% elif rol == 'trabajador' %}
+            <div class="menu-grid">
+                <a href="#" class="menu-btn btn-analista">
+                    📄 Consultar Mis Recibos de Pago (LOTTT 106)
+                </a>
+                <a href="#" class="menu-btn btn-directora">
+                    💬 Asistente Virtual (Chatbot)
+                </a>
+            </div>
+
+        <!-- Opciones para Técnico de Informática -->
+        {% else %}
+            <div class="menu-grid">
+                <a href="{{ url_for('nomina.historial') }}" class="menu-btn btn-historial">
+                    ⚙️ Monitoreo y Auditoría de Periodos
+                </a>
+            </div>
+        {% endif %}
     </div>
 </body>
 </html>

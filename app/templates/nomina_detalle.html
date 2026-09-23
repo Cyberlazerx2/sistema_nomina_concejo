@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Detalle de Nómina #{{ periodo.periodo_id }} - Concejo Municipal</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
+        .container { max-width: 1100px; margin: 0 auto; }
+        .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); margin-bottom: 20px; }
+        .header-status { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 15px; }
+        .badge { padding: 6px 12px; border-radius: 4px; font-size: 13px; font-weight: bold; text-transform: uppercase; color: white; }
+        .badge-borrador { background: #f39c12; }
+        .badge-revisada { background: #3498db; }
+        .badge-aprobada { background: #27ae60; }
+        .badge-rechazada { background: #e74c3c; }
+        .badge-procesada_patria { background: #2c3e50; }
+        .actions-panel { background: #eef2f7; border: 1px solid #d1d8e0; padding: 15px; border-radius: 6px; margin: 20px 0; display: flex; justify-content: space-between; align-items: center; }
+        .btn { padding: 9px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; text-decoration: none; display: inline-block; font-size: 13px; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-danger { background: #c0392b; color: white; }
+        .btn-patria { background: #8e44ad; color: white; }
+        .btn-secondary { background: #7f8c8d; color: white; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #2c3e50; color: white; }
+        .text-right { text-align: right; }
+        .alert { padding: 10px; border-radius: 4px; margin-bottom: 15px; }
+        .alert-success { background-color: #d4edda; color: #155724; }
+        .alert-warning { background-color: #fff3cd; color: #856404; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="margin-bottom: 15px;">
+            <a href="{{ url_for('nomina.historial') }}" class="btn btn-secondary">← Volver al Historial</a>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="card">
+
+            {% if periodo.observaciones_rechazo or periodo.estado == 'rechazada' %}
+                <div style="background-color: #fde8e8; border-left: 6px solid #e02424; padding: 18px; margin: 15px 0; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 20px;">⚠️</span>
+                        <h4 style="margin: 0; color: #9b1c1c; font-size: 16px;">Nómina Devuelta / Rechazada con Observaciones:</h4>
+                    </div>
+                    <p style="margin: 8px 0 0 28px; color: #771d1d; font-size: 14px; font-weight: bold; background: white; padding: 10px; border-radius: 4px; border: 1px solid #f8b4b4;">
+                        {{ periodo.observaciones_rechazo if periodo.observaciones_rechazo else 'No se detalló motivo específico.' }}
+                    </p>
+                    <small style="color: #9b1c1c; display: block; margin: 8px 0 0 28px;">
+                        * El Analista o la Dirección deben solventar estas observaciones antes de solicitar una nueva validación.
+                    </small>
+                </div>
+            {% endif %}
+
+            <div class="header-status">
+                <div>
+                    <h2 style="margin: 0; color: #2c3e50;">Periodo #{{ periodo.periodo_id }}: {{ periodo.descripcion }}</h2>
+                    <p style="margin: 5px 0 0 0; color: #7f8c8d;">Tipo de Nómina: <strong>{{ periodo.tipo_nomina }}</strong> | Lapso: {{ periodo.fecha_inicio }} al {{ periodo.fecha_fin }}</p>
+                </div>
+                <div>
+                    <span class="badge badge-{{ periodo.estado }}">{{ periodo.estado }}</span>
+                </div>
+            </div>
+
+            <!-- Panel de Acciones por Rol Institucional -->
+
+            <!-- Panel de Recálculo / Subsanación para Analista o Directora -->
+            {% if session.rol in ['analista_rrhh', 'directora_rrhh'] and periodo.estado in ['borrador', 'rechazada'] %}
+            <div class="actions-panel" style="background: #fef9e7; border-color: #f9e79f;">
+                <div>
+                    <strong>Acción Operativa:</strong> ¿Se corrigieron datos de asistencia o salarios? Puede recalcular este periodo.
+                </div>
+                <div>
+                    <form method="POST" action="{{ url_for('nomina.recalcular', periodo_id=periodo.periodo_id) }}" style="display: inline;">
+                        <button type="submit" class="btn" style="background-color: #d35400; color: white;" onclick="return confirm('¿Desea volver a ejecutar los cálculos matemáticos para este periodo?');">
+                            🔄 Recalcular y Subsanar Nómina
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if session.rol == 'directora_rrhh' and periodo.estado == 'borrador' %}
+                {% if periodo.observaciones_rechazo %}
+                <div style="background-color: #fde8e8; border-left: 5px solid #e02424; padding: 15px; margin-top: 15px; border-radius: 4px;">
+                    <h4 style="margin: 0 0 5px 0; color: #9b1c1c;">⚠️ Periodo Devuelto con Observaciones:</h4>
+                    <p style="margin: 0; color: #771d1d; font-size: 14px;">{{ periodo.observaciones_rechazo }}</p>
+                    <small style="color: #9b1c1c; display: block; margin-top: 5px;">
+                        * El Analista o la Dirección deben corregir los parámetros antes de solicitar una nueva validación.
+                    </small>
+                </div>
+                {% endif %}
+
+                <!-- Panel de Acciones: Directora de RRHH -->
+                {% if session.rol == 'directora_rrhh' and periodo.estado == 'borrador' %}
+                <div class="actions-panel" style="display: block;">
+                    <form method="POST" action="{{ url_for('nomina.revisar', periodo_id=periodo.periodo_id) }}">
+                        <div style="margin-bottom: 10px;">
+                            <strong>Revisión Técnica (Directora de RRHH):</strong>
+                        </div>
+                        
+                        <div style="margin-bottom: 12px;">
+                            <textarea name="observaciones_rechazo" rows="2" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-family: inherit; font-size: 13px;" placeholder="Si va a rechazar, redacte aquí el motivo del error detectado..."></textarea>
+                        </div>
+
+                        <div>
+                            <button type="submit" name="accion" value="validar" class="btn btn-success">✓ Validar Nómina (Conforme)</button>
+                            <button type="submit" name="accion" value="rechazar" class="btn btn-danger" style="margin-left: 8px;" onclick="return confirm('¿Seguro que desea rechazar y devolver este periodo?');">✕ Rechazar Nómina</button>
+                        </div>
+                    </form>
+                </div>
+                {% endif %}
+            {% endif %}
+
+            {% if session.rol == 'presidente' and periodo.estado == 'revisada' %}
+            <div class="actions-panel" style="background: #e8f8f5; border-color: #a3e4d7; display: block;">
+                <form method="POST" action="{{ url_for('nomina.aprobar', periodo_id=periodo.periodo_id) }}">
+                    <div style="margin-bottom: 10px;">
+                        <strong>Aprobación Institucional (Presidente del Concejo):</strong>
+                    </div>
+
+                    <div style="margin-bottom: 12px;">
+                        <textarea name="observaciones_rechazo" rows="2" style="width: 100%; padding: 8px; border: 1px solid #a3e4d7; border-radius: 4px; box-sizing: border-box; font-family: inherit; font-size: 13px;" placeholder="Si devuelve la nómina, indique las observaciones institucionales o presupuestarias..."></textarea>
+                    </div>
+
+                    <div>
+                        <button type="submit" name="accion" value="aprobar" class="btn btn-success">🔒 Aprobar y Bloquear Periodo</button>
+                        <button type="submit" name="accion" value="devolver" class="btn btn-danger" style="margin-left: 8px;" onclick="return confirm('¿Seguro que desea devolver este periodo a RRHH?');">✕ Devolver a RRHH</button>
+                    </div>
+                </form>
+            </div>
+            {% endif %}
+
+            {% if session.rol == 'directora_rrhh' and periodo.estado in ['aprobada', 'procesada_patria'] %}
+            <div class="actions-panel" style="background: #f4ecf7; border-color: #d2b4de;">
+                <div>
+                    <strong>Dispersión Bancaria:</strong> Nómina aprobada institucionalmente por Presidencia.
+                </div>
+                <div>
+                    <a href="{{ url_for('nomina.exportar_patria', periodo_id=periodo.periodo_id) }}" class="btn btn-patria">
+                        📥 Descargar Archivo TXT Patria (20 dígitos)
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Resumen Financiero -->
+            <div style="display: flex; gap: 20px; margin-top: 15px;">
+                <p><strong>Total Asignaciones:</strong> Bs. {{ periodo.total_asignaciones }}</p>
+                <p><strong>Total Deducciones:</strong> <span style="color: #c0392b;">Bs. {{ periodo.total_deducciones }}</span></p>
+                <p><strong>Total Neto:</strong> <span style="color: #27ae60; font-weight: bold; font-size: 16px;">Bs. {{ periodo.total_neto }}</span></p>
+            </div>
+
+            <!-- Trazabilidad de Responsables -->
+            <div style="font-size: 12px; color: #555; background: #fafafa; padding: 10px; border-radius: 4px; margin-top: 10px;">
+                <span><strong>Elaborada por:</strong> {{ periodo.analista_nom if periodo.analista_nom else 'Pendiente' }}</span> | 
+                <span><strong>Revisada por:</strong> {{ periodo.directora_nom if periodo.directora_nom else 'Pendiente' }}</span> | 
+                <span><strong>Aprobada por:</strong> {{ periodo.presidente_nom if periodo.presidente_nom else 'Pendiente' }}</span>
+            </div>
+        </div>
+
+        <!-- Tabla Detallada de Trabajadores -->
+        <div class="card">
+            <h3>Plantilla y Recibos de Pago del Periodo</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Cédula</th>
+                        <th>Funcionario</th>
+                        <th>Cargo</th>
+                        <th>Banco / Cuenta (20 Dígitos)</th>
+                        <th class="text-right">Neto a Cobrar</th>
+                        <th>Conceptos Aplicados (LOTTT 106)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in trabajadores %}
+                    <tr>
+                        <td>{{ t.cedula }}</td>
+                        <td><strong>{{ t.nombres }} {{ t.apellidos }}</strong></td>
+                        <td>{{ t.cargo_nombre }}</td>
+                        <td style="font-family: monospace; font-size: 11px;">{{ t.banco }}<br>{{ t.numero_cuenta }}</td>
+                        <td class="text-right" style="color: #27ae60; font-weight: bold; font-size: 14px;">Bs. {{ t.neto_pagar }}</td>
+                        <td>
+                            <ul style="margin: 0; padding-left: 15px; font-size: 11px;">
+                                {% for d in t.desglose %}
+                                    <li style="color: {% if d.tipo == 'deduccion' %}#c0392b{% else %}#2c3e50{% endif %};">
+                                        {{ d.descripcion }}: Bs. {{ d.monto }}
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>
