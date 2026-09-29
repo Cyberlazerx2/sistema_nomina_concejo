@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Estructura Organizacional - Departamentos</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+        h2 { color: #2c3e50; margin-top: 0; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #2c3e50; color: white; }
+        .btn { padding: 7px 14px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: bold; display: inline-block; cursor: pointer; border: none; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; color: white; }
+        .badge-activo { background: #27ae60; }
+        .badge-inactivo { background: #c0392b; }
+        .alert { padding: 10px; border-radius: 4px; margin-bottom: 15px; font-size: 13px; }
+        .alert-success { background-color: #d4edda; color: #155724; }
+        .alert-danger { background-color: #f8d7da; color: #721c24; }
+        .alert-warning { background-color: #fff3cd; color: #856404; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h2>Dependencias y Departamentos</h2>
+            <div>
+                <a href="{{ url_for('organizacion.nuevo_departamento') }}" class="btn btn-success">+ Nuevo Departamento</a>
+                <a href="{{ url_for('organizacion.cargos') }}" class="btn btn-secondary" style="background: #2980b9;">Ver Cargos (RAC)</a>
+                <a href="{{ url_for('auth.dashboard') }}" class="btn btn-secondary">Regresar</a>
+            </div>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="card">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre de la Dependencia</th>
+                        <th>Cargos Asignados</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for d in departamentos %}
+                    <tr>
+                        <td>#{{ d.departamento_id }}</td>
+                        <td><strong>{{ d.nombre }}</strong></td>
+                        <td>{{ d.total_cargos }} cargo(s)</td>
+                        <td>
+                            <span class="badge badge-{{ 'activo' if d.activo else 'inactivo' }}">
+                                {{ 'Activo' if d.activo else 'Inactivo' }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" style="text-align: center; color: #7f8c8d;">No hay departamentos registrados.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

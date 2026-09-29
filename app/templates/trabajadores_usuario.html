@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Generar Credenciales - Concejo Municipal</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
+        .container { max-width: 550px; margin: 0 auto; }
+        .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+        h2 { color: #2c3e50; margin-top: 0; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 13px; }
+        input, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .btn { padding: 10px 18px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-primary { background: #0056b3; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h2>Crear Cuenta de Acceso</h2>
+            <p style="font-size: 13px; color: #555;">
+                Vinculando credenciales de acceso para: <strong>{{ trabajador.nombres }} {{ trabajador.apellidos }}</strong> (CI: {{ trabajador.cedula }})[cite: 3].
+            </p>
+
+            <form method="POST">
+                <div class="form-group">
+                    <label>Nombre de Usuario:</label>
+                    <input type="text" name="nombre_usuario" required placeholder="ej: nombre.apellido">
+                </div>
+
+                <div class="form-group">
+                    <label>Contraseña Temporal:</label>
+                    <input type="password" name="clave" required placeholder="Ingrese una clave segura">
+                </div>
+
+                <div class="form-group">
+                    <label>Rol en el Sistema:</label>
+                    <select name="rol_id" required>
+                        {% for r in roles %}
+                            <option value="{{ r.rol_id }}" {% if r.nombre == 'trabajador' %}selected{% endif %}>
+                                {{ r.nombre }} - {{ r.descripcion }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <button type="submit" class="btn btn-primary">Registrar Usuario y Guardar Auditoría</button>
+                    <a href="{{ url_for('trabajadores.listar') }}" class="btn btn-secondary" style="margin-left: 10px;">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

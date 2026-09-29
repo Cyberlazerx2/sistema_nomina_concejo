@@ -53,6 +53,9 @@
                 <a href="{{ url_for('nomina.historial') }}" class="menu-btn btn-historial">
                     📂 Consultar Historial de Periodos
                 </a>
+                <a href="{{ url_for('trabajadores.listar') }}" class="menu-btn btn-historial">
+                    👥 Consultar Plantilla de Trabajadores
+                </a>
             </div>
 
         <!-- Opciones para Directora de RRHH -->
@@ -66,6 +69,9 @@
                 </a>
                 <a href="{{ url_for('nomina.historial') }}" class="menu-btn btn-presidente">
                     📥 Dispersión Bancaria (Exportar TXT Patria)
+                </a>
+                <a href="{{ url_for('trabajadores.listar') }}" class="menu-btn btn-historial">
+                    👥 Gestión de Trabajadores y Expedientes
                 </a>
             </div>
 
@@ -93,6 +99,9 @@
             <div class="menu-grid">
                 <a href="{{ url_for('nomina.historial') }}" class="menu-btn btn-historial">
                     ⚙️ Monitoreo y Auditoría de Periodos
+                </a>
+                <a href="{{ url_for('trabajadores.listar') }}" class="menu-btn btn-analista">
+                    👥 Expedientes y Asignación de Cuentas
                 </a>
             </div>
         {% endif %}

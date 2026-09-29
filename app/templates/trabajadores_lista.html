@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Plantilla de Personal - Concejo Municipal</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+        h2 { color: #2c3e50; margin-top: 0; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #2c3e50; color: white; }
+        .btn { padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: bold; display: inline-block; cursor: pointer; border: none; }
+        .btn-primary { background: #0056b3; color: white; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-warning { background: #e67e22; color: white; }
+        .btn-danger { background: #c0392b; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .badge-user { background: #2980b9; color: white; padding: 3px 6px; border-radius: 3px; font-size: 11px; }
+        .badge-nouser { background: #95a5a6; color: white; padding: 3px 6px; border-radius: 3px; font-size: 11px; }
+        .alert { padding: 10px; border-radius: 4px; margin-bottom: 15px; font-size: 13px; }
+        .alert-success { background-color: #d4edda; color: #155724; }
+        .alert-warning { background-color: #fff3cd; color: #856404; }
+        .alert-danger { background-color: #f8d7da; color: #721c24; }
+        .alert-info { background-color: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h2>Expedientes del Talento Humano</h2>
+            <div>
+                {% if session.rol in ['directora_rrhh', 'tecnico_informatica'] %}
+                    <a href="{{ url_for('trabajadores.nuevo') }}" class="btn btn-success">+ Nuevo Trabajador</a>
+                {% endif %}
+                <a href="{{ url_for('auth.dashboard') }}" class="btn btn-secondary">Regresar al Panel</a>
+            </div>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="card">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Cédula</th>
+                        <th>Funcionario</th>
+                        <th>Cargo / Tipo</th>
+                        <th>Sueldo Base</th>
+                        <th>Carga / Nivel</th>
+                        <th>Cuenta Bancaria</th>
+                        <th>Acceso</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in trabajadores %}
+                    <tr>
+                        <td><strong>{{ t.cedula }}</strong></td>
+                        <td>{{ t.nombres }} {{ t.apellidos }}</td>
+                        <td>{{ t.cargo_nombre }}<br><small style="color: #7f8c8d;">{{ t.tipo_personal }}</small></td>
+                        <td style="font-weight: bold; color: #27ae60;">Bs. {{ t.sueldo_base }}</td>
+                        <td>{{ t.hijos }} hijos<br><small>{{ t.nivel_instruccion }}</small></td>
+                        <td style="font-family: monospace; font-size: 11px;">{{ t.banco }}<br>{{ t.numero_cuenta }}</td>
+                        <td>
+                            {% if t.cuenta_usuario_id %}
+                                <span class="badge-user">Usuario: {{ t.nombre_usuario }}</span>
+                            {% else %}
+                                <span class="badge-nouser">Sin cuenta</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if session.rol in ['directora_rrhh', 'tecnico_informatica'] %}
+                                <a href="{{ url_for('trabajadores.editar', id=t.trabajador_id) }}" class="btn btn-warning">Editar</a>
+                                {% if not t.cuenta_usuario_id %}
+                                    <a href="{{ url_for('trabajadores.crear_usuario', id=t.trabajador_id) }}" class="btn btn-primary">+ Usuario</a>
+                                {% endif %}
+                                <form method="POST" action="{{ url_for('trabajadores.desactivar', id=t.trabajador_id) }}" style="display: inline;" onsubmit="return confirm('¿Confirma dar de baja a este trabajador? Pasará a inactivo con fecha de egreso hoy.');">
+                                    <button type="submit" class="btn btn-danger">Baja</button>
+                                </form>
+                            {% else %}
+                                <span style="color: #95a5a6; font-size: 11px;">Solo Lectura</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" style="text-align: center; color: #7f8c8d;">No hay trabajadores activos registrados en la institución.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

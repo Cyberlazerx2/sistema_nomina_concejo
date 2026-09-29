@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Estructura de Cargos - Concejo Municipal</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
+        .container { max-width: 1050px; margin: 0 auto; }
+        .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+        h2 { color: #2c3e50; margin-top: 0; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #2c3e50; color: white; }
+        .btn { padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: bold; display: inline-block; cursor: pointer; border: none; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-warning { background: #e67e22; color: white; }
+        .btn-danger { background: #c0392b; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .badge { padding: 3px 6px; border-radius: 3px; font-size: 11px; font-weight: bold; color: white; }
+        .badge-activo { background: #27ae60; }
+        .badge-inactivo { background: #7f8c8d; }
+        .alert { padding: 10px; border-radius: 4px; margin-bottom: 15px; font-size: 13px; }
+        .alert-success { background-color: #d4edda; color: #155724; }
+        .alert-danger { background-color: #f8d7da; color: #721c24; }
+        .alert-info { background-color: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h2>Catálogo de Cargos Institucionales (RAC)</h2>
+            <div>
+                <a href="{{ url_for('organizacion.nuevo_cargo') }}" class="btn btn-success">+ Nuevo Cargo</a>
+                <a href="{{ url_for('organizacion.departamentos') }}" class="btn btn-secondary">Ver Departamentos</a>
+                <a href="{{ url_for('auth.dashboard') }}" class="btn btn-secondary">Regresar</a>
+            </div>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="card">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Cargo</th>
+                        <th>Departamento</th>
+                        <th>Sueldo Base (Ref. ONAPRE)</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in cargos %}
+                    <tr>
+                        <td><strong>{{ c.nombre }}</strong></td>
+                        <td>{{ c.departamento_nombre }}</td>
+                        <td style="font-weight: bold; color: #27ae60;">Bs. {{ c.sueldo_base }}</td>
+                        <td>
+                            <span class="badge badge-{{ 'activo' if c.activo else 'inactivo' }}">
+                                {{ 'Activo' if c.activo else 'Inactivo' }}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('organizacion.editar_cargo', id=c.cargo_id) }}" class="btn btn-warning">Editar</a>
+                            {% if c.activo %}
+                            <form method="POST" action="{{ url_for('organizacion.desactivar_cargo', id=c.cargo_id) }}" style="display: inline;" onsubmit="return confirm('¿Desactivar este cargo? Los trabajadores históricos no se verán alterados.');">
+                                <button type="submit" class="btn btn-danger">Desactivar</button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; color: #7f8c8d;">No hay cargos registrados.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>
