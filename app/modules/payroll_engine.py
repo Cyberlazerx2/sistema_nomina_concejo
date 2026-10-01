@@ -21,7 +21,8 @@ MAPA_PRIMA_PROFESIONAL = {
 }
 
 
-def calcular_quincena_trabajador(trabajador, conceptos_catalogo, conceptos_individuales=None):
+def calcular_quincena_trabajador(trabajador, conceptos_catalogo, conceptos_individuales=None,
+                                  solo_cestaticket=False):
     """
     Motor de calculo generico: ningun porcentaje ni monto esta escrito en este archivo.
     Todo se lee de la tabla `concepto` y, para primas que solo aplican a un trabajador
@@ -32,16 +33,17 @@ def calcular_quincena_trabajador(trabajador, conceptos_catalogo, conceptos_indiv
     conceptos_individuales: lista de filas de `concepto_trabajador` para ESTE trabajador,
         cada una con su `concepto` ya resuelto (ver nota de integracion mas abajo).
         Puede venir vacia o None si el trabajador no tiene primas individuales asignadas.
+    solo_cestaticket: el Cestaticket se paga en una corrida MENSUAL aparte, nunca junto
+        a la quincena (confirmado en la entrevista). Cuando esto es True, la funcion
+        calcula UNICAMENTE el Cestaticket y devuelve un resultado simplificado --
+        no toca sueldo, primas ni deducciones, para que nunca se pague dos veces al mes.
     """
     conceptos_individuales = conceptos_individuales or []
-    sueldo_mensual = Decimal(str(trabajador['sueldo_base']))
-    sueldo_quincenal = redondear(sueldo_mensual / Decimal('2'))
+    mapa_conceptos = {c['codigo']: c for c in conceptos_catalogo}
 
     detalles = []
     total_asignaciones = Decimal('0.00')
     total_deducciones = Decimal('0.00')
-
-    mapa_conceptos = {c['codigo']: c for c in conceptos_catalogo}
 
     def agregar(concepto, monto, descripcion=None):
         nonlocal total_asignaciones, total_deducciones
@@ -60,19 +62,39 @@ def calcular_quincena_trabajador(trabajador, conceptos_catalogo, conceptos_indiv
         else:
             total_deducciones += monto
 
+    # RAMA APARTE: corrida mensual de Cestaticket, sin nada mas.
+    if solo_cestaticket:
+        c_ces = mapa_conceptos.get('CESTATICKET')
+        if c_ces:
+            agregar(c_ces, Decimal(str(c_ces['valor'] or 0)), 'Cestaticket Mensual')
+        return {
+            'trabajador_id': trabajador['trabajador_id'],
+            'cedula': trabajador['cedula'],
+            'nombre_completo': f"{trabajador['nombres']} {trabajador['apellidos']}",
+            'dias_trabajados': 30,
+            'total_asignaciones': total_asignaciones,
+            'total_deducciones': Decimal('0.00'),
+            'neto_pagar': redondear(total_asignaciones),
+            'detalles': detalles,
+        }
+
+    sueldo_mensual = Decimal(str(trabajador['sueldo_base']))
+    sueldo_quincenal = redondear(sueldo_mensual / Decimal('2'))
+
     # 1. SUELDO BASE -- el unico concepto que no sale de un porcentaje/monto de la tabla,
     #    porque ES la base sobre la que se calculan los demas.
     c_sueldo = mapa_conceptos.get('SUELDO')
     if c_sueldo:
         agregar(c_sueldo, sueldo_quincenal, 'Sueldo Base Quincenal (15 días)')
 
-    # 2. CONCEPTOS OBLIGATORIOS DE APLICACION GENERAL
-    #    Las 4 deducciones de ley + Cestaticket. Se leen 100% de la base de datos:
+    # 2. CONCEPTOS OBLIGATORIOS DE APLICACION GENERAL EN LA QUINCENA
+    #    Las 4 deducciones de ley. CESTATICKET se excluye siempre aqui: se paga
+    #    mensual, aparte (ver rama solo_cestaticket arriba), nunca dentro de la quincena.
     #      porcentaje -> concepto.valor se aplica sobre el sueldo quincenal
     #      fijo       -> concepto.valor es el monto directo
     #    Cambiar una tasa = editar la fila en `concepto`. Este archivo no se vuelve a tocar.
     for codigo, concepto in mapa_conceptos.items():
-        if codigo == 'SUELDO' or not concepto.get('obligatorio'):
+        if codigo in ('SUELDO', 'CESTATICKET') or not concepto.get('obligatorio'):
             continue
         valor = Decimal(str(concepto['valor'] or 0))
         if concepto['metodo'] == 'porcentaje':

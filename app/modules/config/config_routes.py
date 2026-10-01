@@ -8,18 +8,17 @@ config_bp = Blueprint('config', __name__)
 
 # -------------------------------------------------------------------------
 # 1. TABLA GENERAL DE CONCEPTOS (Activos e Inactivos)
-# Rol exclusivo: tecnico_informatica
+# Rol exclusivo: directora_rrhh
 # -------------------------------------------------------------------------
 @config_bp.route('/conceptos')
 def conceptos():
-    if 'usuario_id' not in session or session.get('rol') != 'tecnico_informatica':
-        flash('Acceso denegado: Solo el Técnico de Informática tiene autorización para parametrizar conceptos.', 'danger')
+    if 'usuario_id' not in session or session.get('rol') != 'directora_rrhh':
+        flash('Acceso denegado: Solo la Directora de Recursos Humanos tiene autorización para parametrizar conceptos.', 'danger')
         return redirect(url_for('auth.dashboard'))
 
     conexion = get_db_connection()
     try:
         with conexion.cursor() as cursor:
-            # Se consultan todos los conceptos sin filtro de activo
             sql = """
                 SELECT concepto_id, codigo, nombre, tipo, metodo, valor, 
                        base_calculo, obligatorio, fundamento, activo
@@ -34,15 +33,14 @@ def conceptos():
 
 # -------------------------------------------------------------------------
 # 2. ACTUALIZAR EXCLUSIVAMENTE 'VALOR' Y 'ACTIVO'
-# Rol exclusivo: tecnico_informatica (Registra auditoría en bitácora)
+# Rol exclusivo: directora_rrhh (Registra auditoría en bitácora)
 # -------------------------------------------------------------------------
 @config_bp.route('/conceptos/<int:id>/actualizar', methods=['POST'])
 def actualizar_concepto(id):
-    if 'usuario_id' not in session or session.get('rol') != 'tecnico_informatica':
-        flash('Acceso denegado: Acción reservada exclusivamente para Informática.', 'danger')
+    if 'usuario_id' not in session or session.get('rol') != 'directora_rrhh':
+        flash('Acceso denegado: Solo la Directora de Recursos Humanos tiene autorización para parametrizar conceptos.', 'danger')
         return redirect(url_for('auth.dashboard'))
 
-    # Se extraen y validan únicamente 'valor' y 'activo'
     valor_raw = request.form.get('valor', '').strip()
     activo_raw = request.form.get('activo')
     activo = True if activo_raw in ['1', 'true', 'on', True] else False
@@ -56,7 +54,6 @@ def actualizar_concepto(id):
     conexion = get_db_connection()
     try:
         with conexion.cursor() as cursor:
-            # 1. Obtener estado previo inalterable para la bitácora
             cursor.execute("SELECT * FROM concepto WHERE concepto_id = %s;", (id,))
             valor_previo = cursor.fetchone()
 
@@ -64,7 +61,6 @@ def actualizar_concepto(id):
                 flash('El concepto a modificar no existe en la base de datos.', 'warning')
                 return redirect(url_for('config.conceptos'))
 
-            # 2. Actualización restringida: no modifica codigo, tipo ni metodo
             sql_update = """
                 UPDATE concepto 
                 SET valor = %s, activo = %s 
@@ -72,11 +68,9 @@ def actualizar_concepto(id):
             """
             cursor.execute(sql_update, (valor_decimal, activo, id))
 
-            # 3. Obtener estado posterior a la modificación
             cursor.execute("SELECT * FROM concepto WHERE concepto_id = %s;", (id,))
             valor_nuevo = cursor.fetchone()
 
-            # 4. Inserción obligatoria de auditoría en la tabla bitácora
             sql_bitacora = """
                 INSERT INTO bitacora (usuario_id, tabla, registro_id, accion, valor_previo, valor_nuevo, fecha_hora, ip)
                 VALUES (%s, 'concepto', %s, 'modificar', %s, %s, %s, %s);

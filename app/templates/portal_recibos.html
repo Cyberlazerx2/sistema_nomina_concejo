@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Mis Recibos de Pago - Concejo Municipal</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); margin-bottom: 20px; }
+        h2 { color: #2c3e50; margin-top: 0; }
+        .user-summary { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 15px; margin-bottom: 15px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #2c3e50; color: white; }
+        .text-right { text-align: right; }
+        .btn { padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: bold; display: inline-block; }
+        .btn-primary { background: #0056b3; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; color: white; text-transform: uppercase; }
+        .badge-aprobada { background: #27ae60; }
+        .badge-procesada_patria { background: #2c3e50; }
+        .alert { padding: 10px; border-radius: 4px; margin-bottom: 15px; font-size: 13px; }
+        .alert-warning { background-color: #fff3cd; color: #856404; }
+        .alert-success { background-color: #d4edda; color: #155724; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h2>Portal del Trabajador — Recibos de Salario</h2>
+            <div>
+                <a href="{{ url_for('portal.perfil') }}" class="btn btn-primary" style="background: #27ae60;">Mi Perfil</a>
+                <a href="{{ url_for('auth.dashboard') }}" class="btn btn-secondary">Regresar al Panel</a>
+            </div>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="card">
+            <div class="user-summary">
+                <div>
+                    <h3 style="margin: 0; color: #2c3e50;">{{ trabajador.nombres }} {{ trabajador.apellidos }}</h3>
+                    <p style="margin: 5px 0 0 0; color: #555; font-size: 13px;">
+                        C.I.: <strong>{{ trabajador.cedula }}</strong> | Cargo: <strong>{{ trabajador.cargo_nombre }}</strong> | Dependencia: <strong>{{ trabajador.departamento_nombre }}</strong>
+                    </p>
+                </div>
+                <div style="text-align: right; font-size: 12px; color: #7f8c8d;">
+                    Cuenta de Cobro:<br><span style="font-family: monospace; color: #333;">{{ trabajador.numero_cuenta }}</span>
+                </div>
+            </div>
+
+            <p style="font-size: 13px; color: #666;">
+                * En cumplimiento del <strong>Artículo 106 de la LOTTT</strong>, a continuación se listan sus comprobantes de pago aprobados formalmente por el Concejo Municipal.
+            </p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Periodo Quincenal</th>
+                        <th>Lapso</th>
+                        <th class="text-right">Total Asignaciones</th>
+                        <th class="text-right">Total Deducciones</th>
+                        <th class="text-right">Neto Cobrado</th>
+                        <th>Estado</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in recibos %}
+                    <tr>
+                        <td><strong>{{ r.descripcion }}</strong></td>
+                        <td>{{ r.fecha_inicio }} al {{ r.fecha_fin }}</td>
+                        <td class="text-right">Bs. {{ r.total_asignaciones }}</td>
+                        <td class="text-right" style="color: #c0392b;">Bs. {{ r.total_deducciones }}</td>
+                        <td class="text-right" style="color: #27ae60; font-weight: bold; font-size: 14px;">Bs. {{ r.neto_pagar }}</td>
+                        <td>
+                            <span class="badge badge-{{ r.estado }}">{{ r.estado }}</span>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('portal.recibo_detalle', periodo_id=r.periodo_id) }}" class="btn btn-primary">
+                                Ver Recibo (PDF/Imprimir)
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" style="text-align: center; color: #7f8c8d; padding: 20px;">
+                            No posee recibos de nómina aprobados hasta la fecha.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

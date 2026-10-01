@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Comprobante de Pago - {{ trabajador.cedula }} - Periodo #{{ recibo.periodo_id }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
+        .receipt-container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .actions-bar { max-width: 800px; margin: 0 auto 15px auto; display: flex; justify-content: space-between; }
+        .btn { padding: 8px 15px; border-radius: 4px; text-decoration: none; font-size: 13px; font-weight: bold; cursor: pointer; border: none; }
+        .btn-print { background: #27ae60; color: white; }
+        .btn-back { background: #6c757d; color: white; }
+        
+        .header { text-align: center; border-bottom: 2px solid #2c3e50; padding-bottom: 12px; margin-bottom: 15px; }
+        .header h3 { margin: 0; font-size: 14px; text-transform: uppercase; color: #333; }
+        .header h2 { margin: 4px 0; font-size: 17px; color: #2c3e50; }
+        .header p { margin: 0; font-size: 12px; font-weight: bold; color: #555; }
+        
+        .grid-info { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; margin-bottom: 15px; background: #fafafa; padding: 12px; border-radius: 4px; border: 1px solid #eee; }
+        .grid-info div span { font-weight: bold; color: #2c3e50; }
+        
+        .table-split { display: flex; gap: 15px; margin-bottom: 15px; }
+        .col-concepts { flex: 1; }
+        .table-concepts { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .table-concepts th { background-color: #2c3e50; color: white; padding: 6px; text-align: left; }
+        .table-concepts td { border: 1px solid #ddd; padding: 6px; }
+        .text-right { text-align: right; }
+        
+        .totals-box { border-top: 2px solid #2c3e50; padding-top: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .net-pay { font-size: 16px; font-weight: bold; color: #27ae60; }
+        .legal-note { margin-top: 20px; font-size: 10px; color: #777; text-align: center; border-top: 1px dashed #ccc; padding-top: 8px; }
+
+        @media print {
+            body { background: white; padding: 0; }
+            .actions-bar { display: none; }
+            .receipt-container { box-shadow: none; border: none; padding: 0; width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="actions-bar">
+        <a href="{{ url_for('portal.recibos') }}" class="btn btn-back">← Volver a Mis Recibos</a>
+        <button onclick="window.print();" class="btn btn-print">🖨️ Imprimir / Guardar en PDF</button>
+    </div>
+
+    <div class="receipt-container">
+        <div class="header">
+            <h3>República Bolivariana de Venezuela</h3>
+            <h2>CONCEJO MUNICIPAL DE INDEPENDENCIA</h2>
+            <p>COMPROBANTE OFICIAL DE PAGO — LOTTT ART. 106</p>
+        </div>
+
+        <div class="grid-info">
+            <div><span>Cédula:</span> {{ trabajador.cedula }}</div>
+            <div><span>Periodo:</span> {{ recibo.descripcion }}</div>
+            <div><span>Funcionario:</span> {{ trabajador.nombres }} {{ trabajador.apellidos }}</div>
+            <div><span>Lapso:</span> {{ recibo.fecha_inicio }} al {{ recibo.fecha_fin }} (15 días)</div>
+            <div><span>Cargo:</span> {{ trabajador.cargo_nombre }}</div>
+            <div><span>Tipo Personal:</span> {{ recibo.tipo_nomina }}</div>
+            <div><span>Dependencia:</span> {{ trabajador.departamento_nombre }}</div>
+            <div><span>Banco / Cuenta:</span> {{ trabajador.banco }} ({{ trabajador.numero_cuenta }})</div>
+        </div>
+
+        <div class="table-split">
+            <!-- Columna Asignaciones -->
+            <div class="col-concepts">
+                <table class="table-concepts">
+                    <thead>
+                        <tr>
+                            <th>Asignaciones / Haberes</th>
+                            <th class="text-right">Monto (Bs.)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for a in asignaciones %}
+                        <tr>
+                            <td>{{ a.descripcion }}</td>
+                            <td class="text-right">{{ a.monto }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Columna Deducciones -->
+            <div class="col-concepts">
+                <table class="table-concepts">
+                    <thead>
+                        <tr>
+                            <th>Deducciones de Ley</th>
+                            <th class="text-right">Monto (Bs.)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for d in deducciones %}
+                        <tr>
+                            <td>{{ d.descripcion }}</td>
+                            <td class="text-right" style="color: #c0392b;">{{ d.monto }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="totals-box">
+            <div style="font-size: 12px;">
+                Total Asignaciones: <strong>Bs. {{ recibo.total_asignaciones }}</strong><br>
+                Total Deducciones: <strong style="color: #c0392b;">Bs. {{ recibo.total_deducciones }}</strong>
+            </div>
+            <div class="net-pay">
+                NETO A COBRAR: Bs. {{ recibo.neto_pagar }}
+            </div>
+        </div>
+
+        <div class="legal-note">
+            El presente recibo individualizado constituye prueba fehaciente de la liquidación del salario devengado y de las retenciones parafiscales ejecutadas por la administración municipal, en estricta conformidad con lo dispuesto en el Artículo 106 de la Ley Orgánica del Trabajo, los Trabajadores y las Trabajadoras (LOTTT).
+        </div>
+    </div>
+</body>
+</html>

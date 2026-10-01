@@ -1,6 +1,7 @@
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash, send_file
-import io
 import datetime
+import io
+from decimal import Decimal, ROUND_HALF_UP
+from flask import Blueprint, render_template, request, redirect, url_for, session, flash, send_file
 from app.database import get_db_connection
 from app.modules.payroll_engine import calcular_quincena_trabajador
 
@@ -8,23 +9,22 @@ nomina_bp = Blueprint('nomina', __name__)
 
 @nomina_bp.route('/generar', methods=['GET', 'POST'])
 def generar():
-    # Seguridad RBAC: Solo el analista_rrhh y directora_rrhh pueden elaborar prenominas
     roles_permitidos = ['analista_rrhh', 'directora_rrhh']
     if 'usuario_id' not in session or session.get('rol') not in roles_permitidos:
-        flash('Acceso restringido: Solo el Analista o Directora de RRHH puede elaborar prenóminas.', 'danger')
+        flash('Acceso denegado: El Presidente y otros perfiles no tienen autorización para elaborar nóminas.', 'danger')
         return redirect(url_for('auth.dashboard'))
 
     conexion = get_db_connection()
     try:
         with conexion.cursor() as cursor:
-            # Tipos de nomina segun el marco institucional
             tipos_nomina = [
                 ('empleado_fijo', 'Empleados Fijos'),
                 ('obrero_fijo', 'Obreros Fijos'),
                 ('alto_nivel', 'Alto Nivel (Concejales)'),
                 ('libre_remocion', 'Libre Nombramiento y Remoción'),
                 ('empleado_contratado', 'Empleados Contratados'),
-                ('obrero_contratado', 'Obreros Contratados')
+                ('obrero_contratado', 'Obreros Contratados'),
+                ('cestaticket', 'Cestaticket Mensual')
             ]
 
             if request.method == 'POST':
@@ -33,55 +33,77 @@ def generar():
                 fecha_fin = request.form.get('fecha_fin')
                 descripcion = request.form.get('descripcion')
 
-                # 1. Extraer los trabajadores activos de ese tipo de nomina
-                sql_trabajadores = """
-                    SELECT trabajador_id, cedula, nombres, apellidos, sueldo_base, 
-                           hijos, nivel_instruccion, tipo_personal 
-                    FROM trabajador 
-                    WHERE tipo_personal = %s AND activo = true;
-                """
-                cursor.execute(sql_trabajadores, (tipo_personal,))
+                es_cestaticket = (tipo_personal == 'cestaticket')
+                periodicidad = 'mensual' if es_cestaticket else 'quincenal'
+
+                # Si es cestaticket, incluye a todo el personal activo sin filtrar por tipo_personal
+                if es_cestaticket:
+                    sql_trabajadores = """
+                        SELECT trabajador_id, cedula, nombres, apellidos, sueldo_base, 
+                               hijos, nivel_instruccion, tipo_personal 
+                        FROM trabajador 
+                        WHERE activo = true;
+                    """
+                    cursor.execute(sql_trabajadores)
+                else:
+                    sql_trabajadores = """
+                        SELECT trabajador_id, cedula, nombres, apellidos, sueldo_base, 
+                               hijos, nivel_instruccion, tipo_personal 
+                        FROM trabajador 
+                        WHERE tipo_personal = %s AND activo = true;
+                    """
+                    cursor.execute(sql_trabajadores, (tipo_personal,))
                 plantilla = cursor.fetchall()
 
                 if not plantilla:
                     flash(f'No hay trabajadores activos registrados en la nómina: {tipo_personal}', 'warning')
                     return render_template('nomina_generar.html', tipos_nomina=tipos_nomina)
 
-                # 2. Extraer el catalogo de conceptos activos
                 cursor.execute("SELECT * FROM concepto WHERE activo = true;")
                 conceptos = cursor.fetchall()
 
-                # 3. Procesar el calculo matematico para cada trabajador
                 resultados = []
                 gran_total_asig = 0
                 gran_total_ded = 0
                 gran_total_neto = 0
 
+                sql_ind = """
+                    SELECT ct.valor, c.* FROM concepto_trabajador ct 
+                    JOIN concepto c ON ct.concepto_id = c.concepto_id 
+                    WHERE ct.trabajador_id = %s AND ct.activo = true 
+                    AND (ct.fecha_fin IS NULL OR ct.fecha_fin >= CURDATE());
+                """
+
                 for trab in plantilla:
-                    calc = calcular_quincena_trabajador(trab, conceptos)
+                    cursor.execute(sql_ind, (trab['trabajador_id'],))
+                    conceptos_individuales = cursor.fetchall()
+
+                    calc = calcular_quincena_trabajador(
+                        trab, 
+                        conceptos, 
+                        conceptos_individuales, 
+                        solo_cestaticket=es_cestaticket
+                    )
                     resultados.append(calc)
                     gran_total_asig += calc['total_asignaciones']
                     gran_total_ded += calc['total_deducciones']
                     gran_total_neto += calc['neto_pagar']
 
-                # 4. Si el analista confirma el guardado definitivo en estado borrador
                 if 'confirmar_guardar' in request.form:
-                    # Crear cabecera en periodo_nomina
                     sql_periodo = """
                         INSERT INTO periodo_nomina (
                             descripcion, tipo_nomina, periodicidad, fecha_inicio, fecha_fin, 
                             estado, elaborada_por, fecha_elaboracion, 
                             total_asignaciones, total_deducciones, total_neto
-                        ) VALUES (%s, %s, 'quincenal', %s, %s, 'borrador', %s, %s, %s, %s, %s);
+                        ) VALUES (%s, %s, %s, %s, %s, 'borrador', %s, %s, %s, %s, %s);
                     """
                     ahora = datetime.datetime.now()
                     cursor.execute(sql_periodo, (
-                        descripcion, tipo_personal, fecha_inicio, fecha_fin,
+                        descripcion, tipo_personal, periodicidad, fecha_inicio, fecha_fin,
                         session['usuario_id'], ahora, gran_total_asig, gran_total_ded, gran_total_neto
                     ))
                     periodo_id = cursor.lastrowid
 
-                    # Insertar cada trabajador en nomina_trabajador y sus renglones en nomina_detalle
                     for r in resultados:
                         sql_nt = """
                             INSERT INTO nomina_trabajador (
@@ -95,7 +117,6 @@ def generar():
                         ))
                         nomina_trabajador_id = cursor.lastrowid
 
-                        # Insertar desglose inalterable (LOTTT Art 106)
                         sql_nd = """
                             INSERT INTO nomina_detalle (
                                 nomina_trabajador_id, concepto_id, codigo_concepto, 
@@ -115,7 +136,6 @@ def generar():
                     flash(f'¡Pre-nómina generada exitosamente en estado BORRADOR! Periodo #{periodo_id}', 'success')
                     return redirect(url_for('nomina.historial'))
 
-                # Si solo pulso "Calcular", mostramos la vista previa en pantalla
                 return render_template(
                     'nomina_generar.html', 
                     tipos_nomina=tipos_nomina,
@@ -141,9 +161,13 @@ def generar():
 
 @nomina_bp.route('/historial')
 def historial():
-    """Muestra la lista de periodos calculados y sus estados actuales."""
     if 'usuario_id' not in session:
         return redirect(url_for('auth.login'))
+
+    roles_permitidos = ['analista_rrhh', 'directora_rrhh', 'presidente', 'tecnico_informatica']
+    if session.get('rol') not in roles_permitidos:
+        flash('Acceso denegado: El personal trabajador debe consultar sus recibos a través de su portal personal.', 'danger')
+        return redirect(url_for('auth.dashboard'))
 
     conexion = get_db_connection()
     try:
@@ -159,17 +183,20 @@ def historial():
             return render_template('nomina_historial.html', periodos=periodos)
     finally:
         conexion.close()
-        
+
 @nomina_bp.route('/detalle/<int:periodo_id>')
 def detalle(periodo_id):
-    """Muestra el desglose completo de un periodo: cabecera, trabajadores y recibos."""
     if 'usuario_id' not in session:
         return redirect(url_for('auth.login'))
+
+    roles_permitidos = ['analista_rrhh', 'directora_rrhh', 'presidente', 'tecnico_informatica']
+    if session.get('rol') not in roles_permitidos:
+        flash('Acceso denegado: El personal trabajador debe consultar sus recibos a través de su portal personal.', 'danger')
+        return redirect(url_for('auth.dashboard'))
 
     conexion = get_db_connection()
     try:
         with conexion.cursor() as cursor:
-            # 1. Cabecera del periodo con nombres de responsables
             sql_p = """
                 SELECT p.*, 
                        u1.nombre_usuario AS analista_nom,
@@ -188,7 +215,6 @@ def detalle(periodo_id):
                 flash('El periodo solicitado no existe.', 'warning')
                 return redirect(url_for('nomina.historial'))
 
-            # 2. Lista de trabajadores con sus totales en este periodo
             sql_trab = """
                 SELECT nt.*, t.cedula, t.nombres, t.apellidos, t.banco, t.numero_cuenta, c.nombre AS cargo_nombre
                 FROM nomina_trabajador nt
@@ -199,7 +225,6 @@ def detalle(periodo_id):
             cursor.execute(sql_trab, (periodo_id,))
             trabajadores = cursor.fetchall()
 
-            # 3. Renglones detallados (LOTTT Art. 106)
             for trab in trabajadores:
                 sql_det = """
                     SELECT codigo_concepto, descripcion, tipo, monto 
@@ -215,7 +240,6 @@ def detalle(periodo_id):
 
 @nomina_bp.route('/revisar/<int:periodo_id>', methods=['POST'])
 def revisar(periodo_id):
-    """Accion de la Directora: Validar o Rechazar con observaciones."""
     if 'usuario_id' not in session or session.get('rol') != 'directora_rrhh':
         flash('Acceso restringido: Solo la Directora de RRHH puede validar nóminas.', 'danger')
         return redirect(url_for('nomina.historial'))
@@ -252,7 +276,6 @@ def revisar(periodo_id):
                 cursor.execute(sql, (motivo, periodo_id))
                 conexion.commit()
                 flash(f'Periodo #{periodo_id} marcado como RECHAZADO con observaciones.', 'warning')
-
     finally:
         conexion.close()
 
@@ -260,7 +283,6 @@ def revisar(periodo_id):
 
 @nomina_bp.route('/aprobar/<int:periodo_id>', methods=['POST'])
 def aprobar(periodo_id):
-    """Accion del Presidente: Aprobacion legal o Devolucion con observaciones."""
     if 'usuario_id' not in session or session.get('rol') != 'presidente':
         flash('Acceso restringido: Solo el Presidente del Concejo puede aprobar nóminas.', 'danger')
         return redirect(url_for('nomina.historial'))
@@ -297,7 +319,6 @@ def aprobar(periodo_id):
                 cursor.execute(sql, (motivo, periodo_id))
                 conexion.commit()
                 flash(f'Periodo #{periodo_id} devuelto y marcado como RECHAZADO.', 'warning')
-
     finally:
         conexion.close()
 
@@ -305,7 +326,6 @@ def aprobar(periodo_id):
 
 @nomina_bp.route('/exportar-patria/<int:periodo_id>')
 def exportar_patria(periodo_id):
-    """Genera y descarga el archivo plano TXT oficial para la plataforma Patria."""
     if 'usuario_id' not in session or session.get('rol') != 'directora_rrhh':
         flash('Acceso restringido: Solo la Directora de RRHH puede exportar a Patria.', 'danger')
         return redirect(url_for('nomina.historial'))
@@ -313,7 +333,6 @@ def exportar_patria(periodo_id):
     conexion = get_db_connection()
     try:
         with conexion.cursor() as cursor:
-            # 1. Verificar que el periodo este aprobado
             cursor.execute("SELECT * FROM periodo_nomina WHERE periodo_id = %s;", (periodo_id,))
             periodo = cursor.fetchone()
 
@@ -321,7 +340,6 @@ def exportar_patria(periodo_id):
                 flash('Solo se pueden exportar nóminas aprobadas formalmente por Presidencia.', 'warning')
                 return redirect(url_for('nomina.detalle', periodo_id=periodo_id))
 
-            # 2. Consultar trabajadores del periodo con sus cuentas bancarias de 20 digitos
             sql = """
                 SELECT t.cedula, t.numero_cuenta, nt.neto_pagar 
                 FROM nomina_trabajador nt
@@ -331,8 +349,6 @@ def exportar_patria(periodo_id):
             cursor.execute(sql, (periodo_id,))
             registros = cursor.fetchall()
 
-            # 3. Construccion del archivo plano TXT en memoria (sin tocar disco)
-            # Formato estandar Patria: CEDULA;NUMERO_CUENTA_20_DIGITOS;MONTO_NETO
             lineas = []
             for r in registros:
                 cedula_limpia = r['cedula'].replace('V-', '').replace('E-', '').replace('.', '').strip()
@@ -343,7 +359,6 @@ def exportar_patria(periodo_id):
             contenido_txt = "\r\n".join(lineas)
             buffer = io.BytesIO(contenido_txt.encode('utf-8'))
 
-            # 4. Actualizar estado a procesada_patria
             ahora = datetime.datetime.now()
             nombre_archivo = f"PATRIA_NOMINA_{periodo['tipo_nomina']}_PERIODO_{periodo_id}.txt"
             sql_up = """
@@ -362,10 +377,9 @@ def exportar_patria(periodo_id):
             )
     finally:
         conexion.close()
-        
+
 @nomina_bp.route('/recalcular/<int:periodo_id>', methods=['POST'])
 def recalcular(periodo_id):
-    """Permite al Analista o Directora recalcular una nomina en estado borrador o rechazada."""
     roles_permitidos = ['analista_rrhh', 'directora_rrhh']
     if 'usuario_id' not in session or session.get('rol') not in roles_permitidos:
         flash('Acceso restringido: No tiene permisos para recalcular nóminas.', 'danger')
@@ -374,7 +388,6 @@ def recalcular(periodo_id):
     conexion = get_db_connection()
     try:
         with conexion.cursor() as cursor:
-            # 1. Verificar que el periodo exista y este en borrador o rechazada
             cursor.execute("SELECT * FROM periodo_nomina WHERE periodo_id = %s;", (periodo_id,))
             periodo = cursor.fetchone()
 
@@ -386,26 +399,35 @@ def recalcular(periodo_id):
                 flash('Solo se pueden recalcular nóminas en estado Borrador o Rechazada.', 'warning')
                 return redirect(url_for('nomina.detalle', periodo_id=periodo_id))
 
-            # 2. Consultar la plantilla activa correspondiente al tipo de nomina
-            sql_trabajadores = """
-                SELECT trabajador_id, cedula, nombres, apellidos, sueldo_base, 
-                       hijos, nivel_instruccion, tipo_personal 
-                FROM trabajador 
-                WHERE tipo_personal = %s AND activo = true;
-            """
-            cursor.execute(sql_trabajadores, (periodo['tipo_nomina'],))
+            es_cestaticket = (periodo['tipo_nomina'] == 'cestaticket')
+            periodicidad = 'mensual' if es_cestaticket else 'quincenal'
+
+            # Consulta condicional según tipo de nómina
+            if es_cestaticket:
+                sql_trabajadores = """
+                    SELECT trabajador_id, cedula, nombres, apellidos, sueldo_base, 
+                           hijos, nivel_instruccion, tipo_personal 
+                    FROM trabajador 
+                    WHERE activo = true;
+                """
+                cursor.execute(sql_trabajadores)
+            else:
+                sql_trabajadores = """
+                    SELECT trabajador_id, cedula, nombres, apellidos, sueldo_base, 
+                           hijos, nivel_instruccion, tipo_personal 
+                    FROM trabajador 
+                    WHERE tipo_personal = %s AND activo = true;
+                """
+                cursor.execute(sql_trabajadores, (periodo['tipo_nomina'],))
             plantilla = cursor.fetchall()
 
             if not plantilla:
                 flash(f'No hay trabajadores activos para el tipo: {periodo["tipo_nomina"]}', 'warning')
                 return redirect(url_for('nomina.detalle', periodo_id=periodo_id))
 
-            # 3. Consultar conceptos activos
             cursor.execute("SELECT * FROM concepto WHERE activo = true;")
             conceptos = cursor.fetchall()
 
-            # 4. Limpiar los calculos viejos de este periodo (nomina_detalle y nomina_trabajador)
-            # Primero obtenemos los IDs de nomina_trabajador para borrar sus renglones
             cursor.execute("SELECT nomina_trabajador_id FROM nomina_trabajador WHERE periodo_id = %s;", (periodo_id,))
             viejos_ids = [row['nomina_trabajador_id'] for row in cursor.fetchall()]
 
@@ -414,18 +436,31 @@ def recalcular(periodo_id):
                 cursor.execute(f"DELETE FROM nomina_detalle WHERE nomina_trabajador_id IN ({formato_in});", viejos_ids)
                 cursor.execute("DELETE FROM nomina_trabajador WHERE periodo_id = %s;", (periodo_id,))
 
-            # 5. Ejecutar nuevamente el motor de calculo
             gran_total_asig = 0
             gran_total_ded = 0
             gran_total_neto = 0
 
+            sql_ind = """
+                SELECT ct.valor, c.* FROM concepto_trabajador ct 
+                JOIN concepto c ON ct.concepto_id = c.concepto_id 
+                WHERE ct.trabajador_id = %s AND ct.activo = true 
+                AND (ct.fecha_fin IS NULL OR ct.fecha_fin >= CURDATE());
+            """
+
             for trab in plantilla:
-                calc = calcular_quincena_trabajador(trab, conceptos)
+                cursor.execute(sql_ind, (trab['trabajador_id'],))
+                conceptos_individuales = cursor.fetchall()
+
+                calc = calcular_quincena_trabajador(
+                    trab, 
+                    conceptos, 
+                    conceptos_individuales, 
+                    solo_cestaticket=es_cestaticket
+                )
                 gran_total_asig += calc['total_asignaciones']
                 gran_total_ded += calc['total_deducciones']
                 gran_total_neto += calc['neto_pagar']
 
-                # Insertar cabecera individual
                 sql_nt = """
                     INSERT INTO nomina_trabajador (
                         periodo_id, trabajador_id, dias_trabajados, 
@@ -438,7 +473,6 @@ def recalcular(periodo_id):
                 ))
                 nomina_trabajador_id = cursor.lastrowid
 
-                # Insertar renglones de detalle (LOTTT 106)
                 sql_nd = """
                     INSERT INTO nomina_detalle (
                         nomina_trabajador_id, concepto_id, codigo_concepto, 
@@ -454,11 +488,11 @@ def recalcular(periodo_id):
                 ]
                 cursor.executemany(sql_nd, detalles_datos)
 
-            # 6. Actualizar periodo_nomina: vuelve a BORRADOR, actualiza montos y fecha
             ahora = datetime.datetime.now()
             sql_up = """
                 UPDATE periodo_nomina 
                 SET estado = 'borrador',
+                    periodicidad = %s,
                     total_asignaciones = %s,
                     total_deducciones = %s,
                     total_neto = %s,
@@ -467,7 +501,7 @@ def recalcular(periodo_id):
                 WHERE periodo_id = %s;
             """
             cursor.execute(sql_up, (
-                gran_total_asig, gran_total_ded, gran_total_neto, ahora, 
+                periodicidad, gran_total_asig, gran_total_ded, gran_total_neto, ahora, 
                 session['usuario_id'], periodo_id
             ))
 
@@ -481,3 +515,170 @@ def recalcular(periodo_id):
         conexion.close()
 
     return redirect(url_for('nomina.detalle', periodo_id=periodo_id))
+
+@nomina_bp.route('/reporte-consolidado/<int:periodo_id>')
+def reporte_consolidado(periodo_id):
+    """Genera la sabana de nomina oficial consolidada con firmas institucionales."""
+    if 'usuario_id' not in session:
+        return redirect(url_for('auth.login'))
+
+    roles_permitidos = ['analista_rrhh', 'directora_rrhh', 'presidente', 'tecnico_informatica']
+    if session.get('rol') not in roles_permitidos:
+        flash('Acceso denegado: El personal trabajador no tiene autorización para consultar la nómina consolidada.', 'danger')
+        return redirect(url_for('auth.dashboard'))
+
+    conexion = get_db_connection()
+    try:
+        with conexion.cursor() as cursor:
+            # 1. Cabecera del periodo con trazabilidad de responsables
+            sql_p = """
+                SELECT p.*, 
+                       u1.nombre_usuario AS analista_nom,
+                       u2.nombre_usuario AS directora_nom,
+                       u3.nombre_usuario AS presidente_nom
+                FROM periodo_nomina p
+                LEFT JOIN usuario u1 ON p.elaborada_por = u1.usuario_id
+                LEFT JOIN usuario u2 ON p.revisada_por = u2.usuario_id
+                LEFT JOIN usuario u3 ON p.aprobada_por = u3.usuario_id
+                WHERE p.periodo_id = %s;
+            """
+            cursor.execute(sql_p, (periodo_id,))
+            periodo = cursor.fetchone()
+
+            if not periodo:
+                flash('El periodo solicitado no existe.', 'warning')
+                return redirect(url_for('nomina.historial'))
+
+            # 2. Trabajadores incluidos en este periodo
+            sql_trab = """
+                SELECT nt.*, 
+                       t.cedula, t.nombres, t.apellidos, t.fecha_ingreso, t.sueldo_base,
+                       c.nombre AS cargo_nombre
+                FROM nomina_trabajador nt
+                INNER JOIN trabajador t ON nt.trabajador_id = t.trabajador_id
+                INNER JOIN cargo c ON t.cargo_id = c.cargo_id
+                WHERE nt.periodo_id = %s
+                ORDER BY t.apellidos ASC, t.nombres ASC;
+            """
+            cursor.execute(sql_trab, (periodo_id,))
+            trabajadores_raw = cursor.fetchall()
+
+            es_cestaticket = (periodo['tipo_nomina'] == 'cestaticket')
+
+            # 3. Mapear conceptos individuales de cada trabajador segun formato ODS
+            filas = []
+            totales = {
+                'sueldo_mensual': Decimal('0.00'),
+                'sueldo_quincenal': Decimal('0.00'),
+                'ivss': Decimal('0.00'),
+                'spf': Decimal('0.00'),
+                'faov': Decimal('0.00'),
+                'fejp': Decimal('0.00'),
+                'total_deducciones': Decimal('0.00'),
+                'subtotal': Decimal('0.00'),
+                'prima_prof': Decimal('0.00'),
+                'prima_antig': Decimal('0.00'),
+                'prima_hijos': Decimal('0.00'),
+                'otras_asig': Decimal('0.00'),
+                'total_asignaciones': Decimal('0.00'),
+                'neto_pagar': Decimal('0.00')
+            }
+
+            for idx, t in enumerate(trabajadores_raw, start=1):
+                cursor.execute("""
+                    SELECT codigo_concepto, tipo, monto 
+                    FROM nomina_detalle 
+                    WHERE nomina_trabajador_id = %s;
+                """, (t['nomina_trabajador_id'],))
+                detalles = cursor.fetchall()
+
+                conceptos = {d['codigo_concepto']: Decimal(str(d['monto'])) for d in detalles}
+
+                sueldo_mensual = Decimal(str(t['sueldo_base'])) if not es_cestaticket else Decimal('0.00')
+                sueldo_quincenal = (sueldo_mensual / Decimal('2.00')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP) if not es_cestaticket else Decimal('0.00')
+
+                # Retenciones de ley
+                ivss = conceptos.get('IVSS', Decimal('0.00'))
+                spf = conceptos.get('RPE', Decimal('0.00'))
+                faov = conceptos.get('FAOV', Decimal('0.00'))
+                fejp = conceptos.get('FONDO_JUB', Decimal('0.00'))
+                total_ded = Decimal(str(t['total_deducciones']))
+                subtotal = (sueldo_quincenal - total_ded).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+                # Asignaciones y primas
+                prima_prof = (
+                    conceptos.get('PRIMA_PROF_TSU', Decimal('0.00')) +
+                    conceptos.get('PRIMA_PROF_LIC', Decimal('0.00')) +
+                    conceptos.get('PRIMA_PROF_ESP', Decimal('0.00'))
+                )
+                prima_antig = conceptos.get('PRIMA_ANTIG', Decimal('0.00'))
+                prima_hijos = conceptos.get('PRIMA_HIJO', Decimal('0.00'))
+
+                asignaciones_principales = prima_prof + prima_antig + prima_hijos + sueldo_quincenal
+                otras_asig = Decimal(str(t['total_asignaciones'])) - asignaciones_principales
+                if otras_asig < Decimal('0.00'):
+                    otras_asig = Decimal('0.00')
+
+                neto = Decimal(str(t['neto_pagar']))
+
+                fila = {
+                    'num': idx,
+                    'cedula': t['cedula'],
+                    'nombre_completo': f"{t['nombres']} {t['apellidos']}",
+                    'cargo': t['cargo_nombre'],
+                    'fecha_ingreso': t['fecha_ingreso'],
+                    'sueldo_mensual': sueldo_mensual,
+                    'sueldo_quincenal': sueldo_quincenal,
+                    'ivss': ivss,
+                    'spf': spf,
+                    'faov': faov,
+                    'fejp': fejp,
+                    'total_deducciones': total_ded,
+                    'subtotal': subtotal,
+                    'prima_prof': prima_prof,
+                    'prima_antig': prima_antig,
+                    'prima_hijos': prima_hijos,
+                    'otras_asig': otras_asig,
+                    'total_asignaciones': Decimal(str(t['total_asignaciones'])),
+                    'neto_pagar': neto
+                }
+                filas.append(fila)
+
+                # Acumular totales de columna
+                totales['sueldo_mensual'] += sueldo_mensual
+                totales['sueldo_quincenal'] += sueldo_quincenal
+                totales['ivss'] += ivss
+                totales['spf'] += spf
+                totales['faov'] += faov
+                totales['fejp'] += fejp
+                totales['total_deducciones'] += total_ded
+                totales['subtotal'] += subtotal
+                totales['prima_prof'] += prima_prof
+                totales['prima_antig'] += prima_antig
+                totales['prima_hijos'] += prima_hijos
+                totales['otras_asig'] += otras_asig
+                totales['total_asignaciones'] += Decimal(str(t['total_asignaciones']))
+                totales['neto_pagar'] += neto
+
+            # Denominaciones oficiales del Concejo
+            mapa_nombres = {
+                'alto_nivel': 'NÓMINA DE ALTO NIVEL (CONCEJALES Y DIRECTIVOS)',
+                'libre_remocion': 'NÓMINA DE LIBRE NOMBRAMIENTO Y REMOCIÓN',
+                'empleado_fijo': 'NÓMINA DE EMPLEADOS FIJOS (ORDINARIA)',
+                'empleado_contratado': 'NÓMINA DE EMPLEADOS CONTRATADOS',
+                'obrero_fijo': 'NÓMINA DE OBREROS FIJOS',
+                'obrero_contratado': 'NÓMINA DE OBREROS CONTRATADOS ORDINARIA',
+                'cestaticket': 'NÓMINA ESPECIAL DE BONO DE ALIMENTACIÓN CESTATICKET SOCIALISTA'
+            }
+            titulo_nomina = mapa_nombres.get(periodo['tipo_nomina'], periodo['tipo_nomina'].upper())
+
+            return render_template(
+                'nomina_consolidada.html',
+                periodo=periodo,
+                titulo_nomina=titulo_nomina,
+                filas=filas,
+                totales=totales,
+                es_cestaticket=es_cestaticket
+            )
+    finally:
+        conexion.close()

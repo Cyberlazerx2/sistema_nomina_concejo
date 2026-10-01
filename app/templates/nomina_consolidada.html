@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Sábana Consolidada - Periodo #{{ periodo.periodo_id }} - Concejo Municipal</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 15px; color: #222; }
+        .no-print-bar { max-width: 1400px; margin: 0 auto 12px auto; display: flex; justify-content: space-between; align-items: center; }
+        .btn { padding: 8px 16px; border-radius: 4px; font-weight: bold; text-decoration: none; cursor: pointer; border: none; font-size: 13px; }
+        .btn-print { background-color: #27ae60; color: white; }
+        .btn-secondary { background-color: #6c757d; color: white; }
+        
+        .sheet-container { max-width: 1400px; margin: 0 auto; background: white; padding: 25px; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+        
+        .header-table { width: 100%; border-bottom: 2px solid #2c3e50; padding-bottom: 8px; margin-bottom: 12px; }
+        .header-table td { border: none; padding: 2px; }
+        .inst-title { font-size: 14px; font-weight: bold; text-transform: uppercase; color: #1a252f; margin: 0; }
+        .sub-title { font-size: 11px; color: #555; margin: 2px 0 0 0; }
+        .nom-title { font-size: 15px; font-weight: bold; color: #2c3e50; margin: 6px 0 0 0; text-transform: uppercase; }
+        
+        .table-consolidada { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 10px; }
+        .table-consolidada th, .table-consolidada td { border: 1px solid #777; padding: 4px 5px; text-align: left; }
+        .table-consolidada th { background-color: #eef2f7; color: #1a252f; font-weight: bold; text-align: center; }
+        .table-consolidada tr:nth-child(even) { background-color: #fafbfc; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .row-total { background-color: #e9ecef !important; font-weight: bold; }
+        
+        .signatures-grid { display: flex; justify-content: space-between; margin-top: 35px; gap: 20px; page-break-inside: avoid; }
+        .sig-box { flex: 1; text-align: center; border-top: 1px solid #333; padding-top: 8px; font-size: 11px; }
+        .sig-box strong { display: block; font-size: 12px; margin-bottom: 2px; }
+        
+        @page {
+            size: landscape;
+            margin: 8mm 6mm;
+        }
+
+        @media print {
+            .no-print-bar { display: none !important; }
+            body { background: white !important; padding: 0 !important; margin: 0 !important; font-size: 9px !important; }
+            .sheet-container { box-shadow: none !important; border: none !important; padding: 0 !important; max-width: 100% !important; }
+            .table-consolidada th { background-color: #ddd !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .row-total { background-color: #eee !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            thead { display: table-header-group; }
+            tfoot { display: table-footer-group; }
+            tr { page-break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="no-print-bar">
+        <a href="{{ url_for('nomina.detalle', periodo_id=periodo.periodo_id) }}" class="btn btn-secondary">← Volver al Detalle</a>
+        <button onclick="window.print();" class="btn btn-print">🖨️ Imprimir / Guardar Sábana en PDF</button>
+    </div>
+
+    <div class="sheet-container">
+        <!-- Encabezado Oficial -->
+        <table class="header-table">
+            <tr>
+                <td style="width: 75%;">
+                    <p class="inst-title">República Bolivariana de Venezuela — Concejo Municipal de Independencia</p>
+                    <p class="sub-title">Dirección de Recursos Humanos | Estado Bolivariano de Yaracuy</p>
+                    <p class="nom-title">{{ titulo_nomina }}</p>
+                    <p style="font-size: 11px; margin: 3px 0 0 0; color: #444;">
+                        <strong>Periodo:</strong> {{ periodo.descripcion }} | <strong>Lapso:</strong> {{ periodo.fecha_inicio }} al {{ periodo.fecha_fin }} | <strong>Estado:</strong> {{ periodo.estado|upper }}
+                    </p>
+                </td>
+                <td style="width: 25%; text-align: right; vertical-align: top; font-size: 11px; color: #555;">
+                    Periodo N°: <strong>#{{ periodo.periodo_id }}</strong><br>
+                    Periodicidad: <strong>{{ periodo.periodicidad|upper }}</strong><br>
+                    Total Personal: <strong>{{ filas|length }} funcionarios</strong>
+                </td>
+            </tr>
+        </table>
+
+        <!-- Tabla Sábana de Datos -->
+        <table class="table-consolidada">
+            <thead>
+                <tr>
+                    <th rowspan="2">N°</th>
+                    <th rowspan="2">Cédula</th>
+                    <th rowspan="2">Nombres y Apellidos</th>
+                    <th rowspan="2">Cargo</th>
+                    <th rowspan="2">F. Ingreso</th>
+                    {% if not es_cestaticket %}
+                        <th rowspan="2">Sueldo Mensual</th>
+                        <th rowspan="2">Sueldo Quincenal</th>
+                        <th colspan="4">Retenciones de Ley (LOTTT)</th>
+                        <th rowspan="2">Total Deduc.</th>
+                        <th rowspan="2">Sub-Total</th>
+                        <th colspan="3">Primas de Tabulador</th>
+                        {% if totales.otras_asig > 0 %}
+                            <th rowspan="2">Otras Asig.</th>
+                        {% endif %}
+                    {% else %}
+                        <th rowspan="2">Días</th>
+                        <th rowspan="2">Asignación Cestaticket</th>
+                    {% endif %}
+                    <th rowspan="2">Total Neto a Pagar</th>
+                    <th rowspan="2" style="width: 90px;">Firma del Funcionario</th>
+                </tr>
+                {% if not es_cestaticket %}
+                <tr>
+                    <th>IVSS (4%)</th>
+                    <th>SPF (0.5%)</th>
+                    <th>FAOV (1%)</th>
+                    <th>FEJP (3%)</th>
+                    <th>Profesional</th>
+                    <th>Antigüedad</th>
+                    <th>Hijos</th>
+                </tr>
+                {% endif %}
+            </thead>
+            <tbody>
+                {% for f in filas %}
+                <tr>
+                    <td class="text-center">{{ f.num }}</td>
+                    <td><strong>{{ f.cedula }}</strong></td>
+                    <td>{{ f.nombre_completo }}</td>
+                    <td>{{ f.cargo }}</td>
+                    <td class="text-center">{{ f.fecha_ingreso }}</td>
+                    {% if not es_cestaticket %}
+                        <td class="text-right">Bs. {{ f.sueldo_mensual }}</td>
+                        <td class="text-right">Bs. {{ f.sueldo_quincenal }}</td>
+                        <td class="text-right" style="color: #c0392b;">{{ f.ivss }}</td>
+                        <td class="text-right" style="color: #c0392b;">{{ f.spf }}</td>
+                        <td class="text-right" style="color: #c0392b;">{{ f.faov }}</td>
+                        <td class="text-right" style="color: #c0392b;">{{ f.fejp }}</td>
+                        <td class="text-right" style="font-weight: bold; color: #c0392b;">Bs. {{ f.total_deducciones }}</td>
+                        <td class="text-right" style="font-weight: bold;">Bs. {{ f.subtotal }}</td>
+                        <td class="text-right">{{ f.prima_prof }}</td>
+                        <td class="text-right">{{ f.prima_antig }}</td>
+                        <td class="text-right">{{ f.prima_hijos }}</td>
+                        {% if totales.otras_asig > 0 %}
+                            <td class="text-right">{{ f.otras_asig }}</td>
+                        {% endif %}
+                    {% else %}
+                        <td class="text-center">30</td>
+                        <td class="text-right">Bs. {{ f.total_asignaciones }}</td>
+                    {% endif %}
+                    <td class="text-right" style="font-weight: bold; color: #27ae60; font-size: 11px;">
+                        Bs. {{ f.neto_pagar }}
+                    </td>
+                    <td></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr class="row-total">
+                    <td colspan="5" class="text-center">TOTALES GENERALES (Bs.)</td>
+                    {% if not es_cestaticket %}
+                        <td class="text-right">{{ totales.sueldo_mensual }}</td>
+                        <td class="text-right">{{ totales.sueldo_quincenal }}</td>
+                        <td class="text-right">{{ totales.ivss }}</td>
+                        <td class="text-right">{{ totales.spf }}</td>
+                        <td class="text-right">{{ totales.faov }}</td>
+                        <td class="text-right">{{ totales.fejp }}</td>
+                        <td class="text-right">{{ totales.total_deducciones }}</td>
+                        <td class="text-right">{{ totales.subtotal }}</td>
+                        <td class="text-right">{{ totales.prima_prof }}</td>
+                        <td class="text-right">{{ totales.prima_antig }}</td>
+                        <td class="text-right">{{ totales.prima_hijos }}</td>
+                        {% if totales.otras_asig > 0 %}
+                            <td class="text-right">{{ totales.otras_asig }}</td>
+                        {% endif %}
+                    {% else %}
+                        <td></td>
+                        <td class="text-right">Bs. {{ totales.total_asignaciones }}</td>
+                    {% endif %}
+                    <td class="text-right" style="font-size: 12px; color: #27ae60;">
+                        Bs. {{ totales.neto_pagar }}
+                    </td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+
+        <!-- Firmas Institucionales del Concejo Municipal -->
+        <div class="signatures-grid">
+            <div class="sig-box">
+                <strong>ELABORADO POR:</strong>
+                {{ periodo.analista_nom or 'Analista de Recursos Humanos' }}<br>
+                <span>Firma y Sello / Coordinación de Nómina</span><br>
+                <small style="color: #666;">Fecha: {{ periodo.fecha_elaboracion if periodo.fecha_elaboracion else 'Pendiente' }}</small>
+            </div>
+            <div class="sig-box">
+                <strong>REVISADO POR:</strong>
+                {{ periodo.directora_nom or 'Dirección de Recursos Humanos' }}<br>
+                <span>Firma y Sello / Directora de RRHH</span><br>
+                <small style="color: #666;">Fecha: {{ periodo.fecha_revision if periodo.fecha_revision else 'Pendiente' }}</small>
+            </div>
+            <div class="sig-box">
+                <strong>AUTORIZADO Y APROBADO POR:</strong>
+                {{ periodo.presidente_nom or 'Presidencia del Concejo' }}<br>
+                <span>Firma y Sello / Presidente(a) del Concejo</span><br>
+                <small style="color: #666;">Fecha: {{ periodo.fecha_aprobacion if periodo.fecha_aprobacion else 'Pendiente' }}</small>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

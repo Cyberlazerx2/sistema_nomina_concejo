@@ -73,6 +73,12 @@
                 <a href="{{ url_for('trabajadores.listar') }}" class="menu-btn btn-historial">
                     👥 Gestión de Trabajadores y Expedientes
                 </a>
+                <a href="{{ url_for('organizacion.cargos') }}" class="menu-btn btn-directora">
+                    🏢 Gestión de Cargos y Departamentos
+                </a>
+                <a href="{{ url_for('config.conceptos') }}" class="menu-btn btn-directora">
+                    ⚙️ Parametrizar Deducciones y Asignaciones
+                </a>
             </div>
 
         <!-- Opciones para Presidente del Concejo -->
@@ -86,10 +92,13 @@
         <!-- Opciones para Trabajador Regular -->
         {% elif rol == 'trabajador' %}
             <div class="menu-grid">
-                <a href="#" class="menu-btn btn-analista">
+                <a href="{{ url_for('portal.recibos') }}" class="menu-btn btn-analista">
                     📄 Consultar Mis Recibos de Pago (LOTTT 106)
                 </a>
-                <a href="#" class="menu-btn btn-directora">
+                <a href="{{ url_for('portal.perfil') }}" class="menu-btn btn-directora">
+                    👤 Mi Perfil y Actualización de Contacto
+                </a>
+                <a href="#" class="menu-btn btn-historial">
                     💬 Asistente Virtual (Chatbot)
                 </a>
             </div>
