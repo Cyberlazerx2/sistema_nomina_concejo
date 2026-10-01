@@ -47,6 +47,9 @@
         <!-- Opciones para Analista de RRHH -->
         {% if rol == 'analista_rrhh' %}
             <div class="menu-grid">
+                <a href="{{ url_for('asistencia.listar') }}" class="menu-btn btn-directora">
+                    📅 Control y Novedades de Asistencia
+                </a>
                 <a href="{{ url_for('nomina.generar') }}" class="menu-btn btn-analista">
                     📋 Elaborar y Precalcular Nómina Quincenal
                 </a>
@@ -61,6 +64,9 @@
         <!-- Opciones para Directora de RRHH -->
         {% elif rol == 'directora_rrhh' %}
             <div class="menu-grid">
+                <a href="{{ url_for('asistencia.listar') }}" class="menu-btn btn-historial">
+                    📅 Supervisión de Asistencias
+                </a>
                 <a href="{{ url_for('nomina.generar') }}" class="menu-btn btn-analista">
                     📋 Elaborar Pre-nómina (Excepcional)
                 </a>

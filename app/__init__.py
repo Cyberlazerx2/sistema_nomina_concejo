@@ -51,6 +51,10 @@ def create_app():
     # 6. Portal de Autoservicio del Trabajador
     from app.modules.portal.routes import portal_bp
     app.register_blueprint(portal_bp, url_prefix='/portal')
+    
+    # 7. Módulo de Registro de Asistencia
+    from app.modules.asistencia.asistencia_routes import asistencia_bp
+    app.register_blueprint(asistencia_bp, url_prefix='/asistencia')
 
     @app.route('/')
     def index():

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Control de Asistencia - Concejo Municipal</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); margin-bottom: 20px; }
+        h2, h3 { color: #2c3e50; margin-top: 0; }
+        .filter-bar { display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap; margin-bottom: 15px; }
+        .filter-group { display: flex; align-items: center; gap: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; vertical-align: middle; }
+        th { background-color: #2c3e50; color: white; }
+        .btn { padding: 8px 14px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: bold; cursor: pointer; border: none; display: inline-block; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-primary { background: #0056b3; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; color: white; text-transform: uppercase; }
+        .badge-presente { background: #27ae60; }
+        .badge-falta_justificada { background: #3498db; }
+        .badge-falta_injustificada { background: #e74c3c; }
+        .badge-reposo { background: #e67e22; }
+        .badge-vacaciones { background: #9b59b6; }
+        .badge-permiso { background: #f39c12; }
+        .alert { padding: 10px; border-radius: 4px; margin-bottom: 15px; font-size: 13px; }
+        .alert-success { background-color: #d4edda; color: #155724; }
+        .alert-warning { background-color: #fff3cd; color: #856404; }
+        .alert-danger { background-color: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h2>Control Diario de Asistencia y Novedades</h2>
+            <div>
+                <a href="{{ url_for('asistencia.nueva') }}" class="btn btn-success">+ Cargar Novedad Individual</a>
+                <a href="{{ url_for('auth.dashboard') }}" class="btn btn-secondary">Regresar al Panel</a>
+            </div>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Barra de Carga Rápida y Filtros -->
+        <div class="card">
+            <div class="filter-bar">
+                <!-- Filtro de Consulta -->
+                <form method="GET" action="{{ url_for('asistencia.listar') }}" class="filter-group">
+                    <label><strong>Fecha:</strong></label>
+                    <input type="date" name="fecha" value="{{ fecha_filtro }}" style="padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
+                    
+                    <label><strong>Tipo:</strong></label>
+                    <select name="tipo_personal" style="padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
+                        <option value="">Todos los grupos</option>
+                        <option value="empleado_fijo" {% if tipo_filtro == 'empleado_fijo' %}selected{% endif %}>Empleado Fijo</option>
+                        <option value="obrero_fijo" {% if tipo_filtro == 'obrero_fijo' %}selected{% endif %}>Obrero Fijo</option>
+                        <option value="alto_nivel" {% if tipo_filtro == 'alto_nivel' %}selected{% endif %}>Alto Nivel</option>
+                        <option value="libre_remocion" {% if tipo_filtro == 'libre_remocion' %}selected{% endif %}>Libre Nombramiento</option>
+                        <option value="empleado_contratado" {% if tipo_filtro == 'empleado_contratado' %}selected{% endif %}>Empleado Contratado</option>
+                        <option value="obrero_contratado" {% if tipo_filtro == 'obrero_contratado' %}selected{% endif %}>Obrero Contratado</option>
+                    </select>
+                    <button type="submit" class="btn btn-primary">Filtrar</button>
+                </form>
+
+                <!-- Carga Masiva Ordinaria (Presente) -->
+                <form method="POST" action="{{ url_for('asistencia.carga_diaria') }}" class="filter-group" style="border-left: 1px solid #ddd; padding-left: 15px;">
+                    <input type="hidden" name="fecha_carga" value="{{ fecha_filtro }}">
+                    <label><strong>Carga Ordinaria:</strong></label>
+                    <select name="tipo_personal_carga" required style="padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
+                        <option value="">Seleccione grupo...</option>
+                        <option value="empleado_fijo">Empleados Fijos</option>
+                        <option value="obrero_fijo">Obreros Fijos</option>
+                        <option value="alto_nivel">Alto Nivel</option>
+                        <option value="libre_remocion">Libre Nombramiento</option>
+                        <option value="empleado_contratado">Empleados Contratados</option>
+                        <option value="obrero_contratado">Obreros Contratados</option>
+                    </select>
+                    <button type="submit" class="btn btn-secondary" onclick="return confirm('¿Registrar presencia para los funcionarios sin novedad cargada en este grupo?');">
+                        ⚡ Marcar Presentes
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Tabla de Registros -->
+        <div class="card">
+            <h3>Registros del día: {{ fecha_filtro }}</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>N°</th>
+                        <th>Cédula</th>
+                        <th>Funcionario</th>
+                        <th>Cargo</th>
+                        <th>Tipo Personal</th>
+                        <th>Estado de Asistencia</th>
+                        <th>Observación Administrativa</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in registros %}
+                    <tr>
+                        <td>#{{ r.asistencia_id }}</td>
+                        <td><strong>{{ r.cedula }}</strong></td>
+                        <td>{{ r.nombres }} {{ r.apellidos }}</td>
+                        <td>{{ r.cargo_nombre }}</td>
+                        <td>{{ r.tipo_personal }}</td>
+                        <td>
+                            <span class="badge badge-{{ r.estado }}">{{ r.estado|replace('_', ' ') }}</span>
+                        </td>
+                        <td style="color: #555;">{{ r.observacion or '—' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" style="text-align: center; color: #7f8c8d; padding: 25px;">
+                            No existen registros de asistencia para esta fecha. Use el botón superior para cargar novedades o el selector de carga ordinaria.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Cargar Novedad de Asistencia - Concejo Municipal</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+        h2 { color: #2c3e50; margin-top: 0; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 13px; color: #333; }
+        input, select, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .btn { padding: 10px 18px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h2>Registrar Novedad de Asistencia</h2>
+            <p style="font-size: 12px; color: #666; margin-bottom: 15px;">
+                * Seleccione el trabajador y la condición administrativa correspondiente (reposo médico, permiso, falta o vacaciones). Si ya existe un registro en la fecha, se actualizará su estado.
+            </p>
+
+            <form method="POST">
+                <div class="form-group">
+                    <label>Trabajador:</label>
+                    <select name="trabajador_id" required>
+                        <option value="">Seleccione funcionario...</option>
+                        {% for t in trabajadores %}
+                            <option value="{{ t.trabajador_id }}">
+                                {{ t.cedula }} - {{ t.apellidos }} {{ t.nombres }} ({{ t.tipo_personal }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Fecha:</label>
+                    <input type="date" name="fecha" value="{{ hoy }}" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Estado de Asistencia:</label>
+                    <select name="estado" required>
+                        {% for cod, nom in estados %}
+                            <option value="{{ cod }}">{{ nom }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Observación Administrativa (Máx. 150 caracteres):</label>
+                    <textarea name="observacion" rows="2" maxlength="150" placeholder="Ej: Reposo avalado por IVSS N° 12345 / Permiso por duelo"></textarea>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <button type="submit" class="btn btn-success">Guardar Novedad</button>
+                    <a href="{{ url_for('asistencia.listar') }}" class="btn btn-secondary" style="margin-left: 10px;">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
