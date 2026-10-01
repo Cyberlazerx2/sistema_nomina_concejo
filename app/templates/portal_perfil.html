@@ -12,7 +12,7 @@
         .grid-readonly div span { font-weight: bold; color: #2c3e50; }
         .form-group { margin-bottom: 15px; }
         label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 13px; color: #333; }
-        input, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        input { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
         .btn { padding: 9px 16px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-block; }
         .btn-success { background: #27ae60; color: white; }
         .btn-secondary { background: #6c757d; color: white; }
@@ -25,6 +25,7 @@
         .badge-rechazada { background: #c0392b; }
         .alert { padding: 10px; border-radius: 4px; margin-bottom: 15px; font-size: 13px; }
         .alert-success { background-color: #d4edda; color: #155724; }
+        .alert-info { background-color: #d1ecf1; color: #0c5460; }
         .alert-warning { background-color: #fff3cd; color: #856404; }
     </style>
 </head>
@@ -46,7 +47,7 @@
             {% endif %}
         {% endwith %}
 
-        <!-- Datos Institucionales Inalterables por el Trabajador -->
+        <!-- Expediente Institucional -->
         <div class="card">
             <h3>Expediente Institucional (Solo Lectura)</h3>
             <div class="grid-readonly">
@@ -62,32 +63,27 @@
                 <div><span>Cuenta Nómina:</span> {{ trabajador.numero_cuenta }}</div>
             </div>
 
-            <!-- Formulario de Solicitud de Cambio de Datos de Contacto -->
+            <!-- Formulario de Modificación de Datos de Contacto -->
             <h3>Solicitud de Actualización de Datos de Contacto</h3>
             <p style="font-size: 12px; color: #666;">
-                * Por políticas de control interno, solo puede solicitar la modificación de sus vías de contacto personal. Cualquier cambio requiere aprobación de la Dirección de Recursos Humanos.
+                * Modifique únicamente el dato de contacto que requiera actualizar. La solicitud será evaluada por la Dirección de Recursos Humanos.
             </p>
 
             <form method="POST">
                 <div style="display: flex; gap: 15px;">
                     <div class="form-group" style="flex: 1;">
                         <label>Teléfono de Contacto:</label>
-                        <input type="text" name="telefono" value="{{ trabajador.telefono if trabajador.telefono else '' }}" required>
+                        <input type="text" name="telefono" value="{{ trabajador.telefono or '' }}" placeholder="0412-0000000">
                     </div>
                     <div class="form-group" style="flex: 1;">
                         <label>Correo Electrónico:</label>
-                        <input type="email" name="correo" value="{{ trabajador.correo if trabajador.correo else '' }}" required>
+                        <input type="email" name="correo" value="{{ trabajador.correo or '' }}" placeholder="usuario@correo.com">
                     </div>
                 </div>
 
                 <div class="form-group">
                     <label>Dirección de Habitación:</label>
-                    <input type="text" name="direccion" value="{{ trabajador.direccion if trabajador.direccion else '' }}" required>
-                </div>
-
-                <div class="form-group">
-                    <label>Motivo de la Actualización:</label>
-                    <textarea name="motivo" rows="2" required placeholder="Indique la justificación del cambio de residencia o número telefónico..."></textarea>
+                    <input type="text" name="direccion" value="{{ trabajador.direccion or '' }}" placeholder="Indique residencia actual">
                 </div>
 
                 <button type="submit" class="btn btn-success">Enviar Solicitud a RRHH</button>
@@ -96,14 +92,17 @@
 
         <!-- Historial de Solicitudes -->
         <div class="card">
-            <h3>Historial de Solicitudes Realizadas</h3>
+            <h3>Historial de Solicitudes Emitidas</h3>
             <table>
                 <thead>
                     <tr>
-                        <th>ID</th>
-                        <th>Fecha de Solicitud</th>
-                        <th>Motivo</th>
+                        <th>N°</th>
+                        <th>Fecha</th>
+                        <th>Dato</th>
+                        <th>Valor Anterior</th>
+                        <th>Valor Solicitado</th>
                         <th>Estado</th>
+                        <th>Observación / Respuesta</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -111,14 +110,27 @@
                     <tr>
                         <td>#{{ s.solicitud_id }}</td>
                         <td>{{ s.fecha_solicitud }}</td>
-                        <td>{{ s.motivo }}</td>
+                        <td><strong>{{ s.campo|capitalize }}</strong></td>
+                        <td style="color: #7f8c8d;">{{ s.valor_actual or '(Vacío)' }}</td>
+                        <td style="color: #27ae60; font-weight: bold;">{{ s.valor_nuevo }}</td>
                         <td>
                             <span class="badge badge-{{ s.estado }}">{{ s.estado }}</span>
+                        </td>
+                        <td style="font-size: 11px; color: #555;">
+                            {% if s.estado == 'rechazada' %}
+                                <span style="color: #c0392b;">{{ s.motivo_rechazo or 'Sin observaciones' }}</span>
+                            {% elif s.estado == 'aprobada' %}
+                                <span style="color: #27ae60;">Aprobado el {{ s.fecha_respuesta }}</span>
+                            {% else %}
+                                <span>En espera de revisión</span>
+                            {% endif %}
                         </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="4" style="text-align: center; color: #7f8c8d;">No ha emitido solicitudes de actualización de perfil.</td>
+                        <td colspan="7" style="text-align: center; color: #7f8c8d; padding: 15px;">
+                            No ha emitido solicitudes de cambio de datos.
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>

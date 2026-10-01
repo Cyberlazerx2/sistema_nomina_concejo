@@ -365,3 +365,118 @@ def crear_usuario(id):
         return redirect(url_for('trabajadores.listar'))
     finally:
         conexion.close()
+        
+# -------------------------------------------------------------------------
+# 6. BANDEJA DE SOLICITUDES DE ACTUALIZACIÓN DE PERFIL
+# Rol exclusivo: directora_rrhh
+# -------------------------------------------------------------------------
+@trabajadores_bp.route('/solicitudes')
+def solicitudes():
+    if 'usuario_id' not in session or session.get('rol') != 'directora_rrhh':
+        flash('Acceso denegado: Solo la Directora de RRHH puede gestionar solicitudes de perfil.', 'danger')
+        return redirect(url_for('auth.dashboard'))
+
+    conexion = get_db_connection()
+    try:
+        with conexion.cursor() as cursor:
+            sql = """
+                SELECT s.solicitud_id, s.trabajador_id, s.campo, s.valor_actual, s.valor_nuevo,
+                       s.estado, s.fecha_solicitud, s.fecha_respuesta, s.motivo_rechazo,
+                       t.cedula, t.nombres, t.apellidos, c.nombre AS cargo_nombre
+                FROM solicitud_cambio_perfil s
+                INNER JOIN trabajador t ON s.trabajador_id = t.trabajador_id
+                INNER JOIN cargo c ON t.cargo_id = c.cargo_id
+                ORDER BY CASE WHEN s.estado = 'pendiente' THEN 1 ELSE 2 END,
+                         s.solicitud_id DESC;
+            """
+            cursor.execute(sql)
+            solicitudes_lista = cursor.fetchall()
+            return render_template('trabajadores_solicitudes.html', solicitudes=solicitudes_lista)
+    finally:
+        conexion.close()
+
+# -------------------------------------------------------------------------
+# 7. PROCESAR SOLICITUD (APROBAR O RECHAZAR)
+# Actualiza la ficha del trabajador y audita en bitácora
+# -------------------------------------------------------------------------
+@trabajadores_bp.route('/solicitudes/<int:id>/procesar', methods=['POST'])
+def procesar_solicitud(id):
+    if 'usuario_id' not in session or session.get('rol') != 'directora_rrhh':
+        flash('Acceso denegado.', 'danger')
+        return redirect(url_for('auth.dashboard'))
+
+    accion = request.form.get('accion')  # 'aprobar' o 'rechazar'
+    motivo_rechazo = request.form.get('motivo_rechazo', '').strip()
+
+    conexion = get_db_connection()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute("SELECT * FROM solicitud_cambio_perfil WHERE solicitud_id = %s;", (id,))
+            solicitud = cursor.fetchone()
+
+            if not solicitud or solicitud['estado'] != 'pendiente':
+                flash('La solicitud no existe o ya fue procesada previamente.', 'warning')
+                return redirect(url_for('trabajadores.solicitudes'))
+
+            trabajador_id = solicitud['trabajador_id']
+            ahora = datetime.datetime.now()
+
+            # Obtener estado previo del trabajador para bitácora
+            cursor.execute("SELECT * FROM trabajador WHERE trabajador_id = %s;", (trabajador_id,))
+            valor_previo = cursor.fetchone()
+
+            if accion == 'aprobar':
+                campo = solicitud['campo']
+                valor_nuevo = solicitud['valor_nuevo']
+
+                # Actualización protegida sobre el expediente
+                if campo in ['telefono', 'correo', 'direccion']:
+                    sql_update = f"UPDATE trabajador SET {campo} = %s WHERE trabajador_id = %s;"
+                    cursor.execute(sql_update, (valor_nuevo, trabajador_id))
+
+                # Marcar solicitud como aprobada
+                cursor.execute("""
+                    UPDATE solicitud_cambio_perfil 
+                    SET estado = 'aprobada', revisada_por = %s, fecha_respuesta = %s 
+                    WHERE solicitud_id = %s;
+                """, (session['usuario_id'], ahora, id))
+
+                # Obtener estado posterior del trabajador
+                cursor.execute("SELECT * FROM trabajador WHERE trabajador_id = %s;", (trabajador_id,))
+                valor_nuevo_db = cursor.fetchone()
+
+                # Auditoría en bitácora
+                sql_bitacora = """
+                    INSERT INTO bitacora (usuario_id, tabla, registro_id, accion, valor_previo, valor_nuevo, fecha_hora, ip)
+                    VALUES (%s, 'trabajador', %s, 'modificar', %s, %s, %s, %s);
+                """
+                cursor.execute(sql_bitacora, (
+                    session['usuario_id'],
+                    trabajador_id,
+                    json.dumps(valor_previo, default=str),
+                    json.dumps(valor_nuevo_db, default=str),
+                    ahora,
+                    request.remote_addr
+                ))
+
+                conexion.commit()
+                flash(f"Solicitud #{id} APROBADA. El campo '{campo}' de {valor_previo['nombres']} {valor_previo['apellidos']} ha sido actualizado.", 'success')
+
+            elif accion == 'rechazar':
+                motivo_final = motivo_rechazo if motivo_rechazo else 'No cumple con los requisitos institucionales.'
+                cursor.execute("""
+                    UPDATE solicitud_cambio_perfil 
+                    SET estado = 'rechazada', revisada_por = %s, fecha_respuesta = %s, motivo_rechazo = %s 
+                    WHERE solicitud_id = %s;
+                """, (session['usuario_id'], ahora, motivo_final, id))
+
+                conexion.commit()
+                flash(f"Solicitud #{id} marcada como RECHAZADA.", 'info')
+
+    except Exception as e:
+        conexion.rollback()
+        flash(f'Error al procesar la solicitud: {e}', 'danger')
+    finally:
+        conexion.close()
+
+    return redirect(url_for('trabajadores.solicitudes'))

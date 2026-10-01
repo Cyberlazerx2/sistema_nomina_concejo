@@ -123,51 +123,51 @@ def perfil():
                 flash('No cuenta con un perfil de trabajador asociado.', 'warning')
                 return redirect(url_for('auth.dashboard'))
 
-            # Inspección dinámica de columnas para compatibilidad de esquema
-            cursor.execute("DESCRIBE solicitud_cambio_perfil;")
-            columnas_existentes = [col['Field'] for col in cursor.fetchall()]
-
             if request.method == 'POST':
                 telefono_nuevo = request.form.get('telefono', '').strip()
                 correo_nuevo = request.form.get('correo', '').strip()
                 direccion_nueva = request.form.get('direccion', '').strip()
-                motivo = request.form.get('motivo', '').strip()
 
-                if not motivo:
-                    flash('Debe indicar el motivo de la actualización de sus datos.', 'warning')
-                else:
-                    ahora = datetime.datetime.now()
-                    # Soporte flexible según el DDL de la tabla
-                    if 'telefono_nuevo' in columnas_existentes:
-                        sql_sol = """
-                            INSERT INTO solicitud_cambio_perfil 
-                            (trabajador_id, telefono_nuevo, correo_nuevo, direccion_nueva, motivo, estado, fecha_solicitud)
-                            VALUES (%s, %s, %s, %s, %s, 'pendiente', %s);
-                        """
-                        cursor.execute(sql_sol, (trabajador['trabajador_id'], telefono_nuevo, correo_nuevo, direccion_nueva, motivo, ahora))
-                    else:
-                        # Si la estructura usa pares campo / valor_nuevo
-                        sql_sol = """
-                            INSERT INTO solicitud_cambio_perfil 
-                            (trabajador_id, campo_modificar, valor_nuevo, motivo, estado, fecha_solicitud)
-                            VALUES (%s, %s, %s, %s, 'pendiente', %s);
-                        """
-                        cambios = [
-                            ('telefono', telefono_nuevo),
-                            ('correo', correo_nuevo),
-                            ('direccion', direccion_nueva)
-                        ]
-                        for campo, val in cambios:
-                            if val:
-                                cursor.execute(sql_sol, (trabajador['trabajador_id'], campo, val, motivo, ahora))
+                cambios = [
+                    ('telefono', (trabajador.get('telefono') or '').strip(), telefono_nuevo),
+                    ('correo', (trabajador.get('correo') or '').strip(), correo_nuevo),
+                    ('direccion', (trabajador.get('direccion') or '').strip(), direccion_nueva)
+                ]
 
+                solicitudes_creadas = 0
+                ahora = datetime.datetime.now()
+
+                sql_sol = """
+                    INSERT INTO solicitud_cambio_perfil 
+                    (trabajador_id, campo, valor_actual, valor_nuevo, estado, fecha_solicitud)
+                    VALUES (%s, %s, %s, %s, 'pendiente', %s);
+                """
+
+                for campo, actual, nuevo in cambios:
+                    # Se registra solicitud solo si el valor ingresado es diferente al actual
+                    if nuevo and nuevo != actual:
+                        cursor.execute(sql_sol, (
+                            trabajador['trabajador_id'],
+                            campo,
+                            actual,
+                            nuevo,
+                            ahora
+                        ))
+                        solicitudes_creadas += 1
+
+                if solicitudes_creadas > 0:
                     conexion.commit()
-                    flash('Solicitud de actualización enviada a la Dirección de Recursos Humanos.', 'success')
-                    return redirect(url_for('portal.perfil'))
+                    flash(f'Se remitieron {solicitudes_creadas} solicitud(es) de actualización a Recursos Humanos.', 'success')
+                else:
+                    flash('No se detectaron modificaciones en los datos ingresados respecto a su expediente actual.', 'info')
 
-            # Consultar solicitudes previas del trabajador
+                return redirect(url_for('portal.perfil'))
+
+            # Consultar historial de solicitudes del trabajador
             cursor.execute("""
-                SELECT * FROM solicitud_cambio_perfil 
+                SELECT solicitud_id, campo, valor_actual, valor_nuevo, estado, 
+                       fecha_solicitud, fecha_respuesta, motivo_rechazo 
+                FROM solicitud_cambio_perfil 
                 WHERE trabajador_id = %s 
                 ORDER BY solicitud_id DESC;
             """, (trabajador['trabajador_id'],))
