@@ -275,13 +275,13 @@ def desactivar(id):
 
 # -------------------------------------------------------------------------
 # 5. CREAR CUENTA DE USUARIO LIGADA
-# Roles: directora_rrhh, tecnico_informatica
+# Rol exclusivo: tecnico_informatica
 # -------------------------------------------------------------------------
 @trabajadores_bp.route('/<int:id>/crear-usuario', methods=['GET', 'POST'])
 def crear_usuario(id):
-    roles_permitidos = ['directora_rrhh', 'tecnico_informatica']
+    roles_permitidos = ['tecnico_informatica']
     if 'usuario_id' not in session or session.get('rol') not in roles_permitidos:
-        flash('Acceso denegado: No tiene autorización para gestionar accesos de usuarios.', 'danger')
+        flash('Acceso denegado: La administración y creación de cuentas de usuario es competencia exclusiva del Técnico de Informática.', 'danger')
         return redirect(url_for('trabajadores.listar'))
 
     conexion = get_db_connection()

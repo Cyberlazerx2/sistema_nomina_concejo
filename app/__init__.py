@@ -55,6 +55,10 @@ def create_app():
     # 7. Módulo de Registro de Asistencia
     from app.modules.asistencia.asistencia_routes import asistencia_bp
     app.register_blueprint(asistencia_bp, url_prefix='/asistencia')
+    
+    # 8. Módulo Técnico de Informática (Soporte y Seguridad)
+    from app.modules.tecnico.tecnico_routes import tecnico_bp
+    app.register_blueprint(tecnico_bp, url_prefix='/tecnico')
 
     @app.route('/')
     def index():

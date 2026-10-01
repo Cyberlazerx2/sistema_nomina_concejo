@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Bitácora de Auditoría - Concejo Municipal</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
+        .container { max-width: 1300px; margin: 0 auto; }
+        .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); margin-bottom: 20px; }
+        h2, h3 { color: #2c3e50; margin-top: 0; }
+        .filter-bar { display: flex; gap: 15px; align-items: center; flex-wrap: wrap; margin-bottom: 15px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 12px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: top; }
+        th { background-color: #2c3e50; color: white; }
+        .btn { padding: 6px 14px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: bold; cursor: pointer; border: none; }
+        .btn-primary { background: #0056b3; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .tag-accion { padding: 3px 6px; border-radius: 3px; font-size: 10px; font-weight: bold; text-transform: uppercase; color: white; }
+        .tag-insertar { background: #27ae60; }
+        .tag-modificar { background: #e67e22; }
+        .tag-eliminar { background: #c0392b; }
+        pre { margin: 0; font-family: monospace; font-size: 11px; white-space: pre-wrap; word-break: break-all; max-height: 80px; overflow-y: auto; background: #f8f9fa; padding: 4px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h2>Auditoría Inalterable del Sistema (Bitácora)</h2>
+            <div>
+                <a href="{{ url_for('tecnico.backup') }}" class="btn btn-primary" style="background: #27ae60;">💾 Descargar Respaldo SQL</a>
+                <a href="{{ url_for('auth.dashboard') }}" class="btn btn-secondary">Regresar al Panel</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <!-- Barra de Filtro -->
+            <form method="GET" action="{{ url_for('tecnico.bitacora') }}" class="filter-bar">
+                <div>
+                    <label><strong>Tabla Auditada:</strong></label>
+                    <select name="tabla" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
+                        <option value="">Todas las tablas</option>
+                        {% for t in tablas %}
+                            <option value="{{ t }}" {% if tabla_filtro == t %}selected{% endif %}>{{ t }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label><strong>Acción:</strong></label>
+                    <select name="accion" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
+                        <option value="">Todas las acciones</option>
+                        <option value="insertar" {% if accion_filtro == 'insertar' %}selected{% endif %}>Insertar</option>
+                        <option value="modificar" {% if accion_filtro == 'modificar' %}selected{% endif %}>Modificar</option>
+                        <option value="eliminar" {% if accion_filtro == 'eliminar' %}selected{% endif %}>Eliminar (Baja Lógica)</option>
+                    </select>
+                </div>
+                <div>
+                    <button type="submit" class="btn btn-primary">Filtrar Auditoría</button>
+                    <a href="{{ url_for('tecnico.bitacora') }}" class="btn btn-secondary">Limpiar</a>
+                </div>
+            </form>
+
+            <!-- Tabla de Eventos -->
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Fecha y Hora</th>
+                        <th>Usuario Responsable</th>
+                        <th>Tabla</th>
+                        <th>Reg. ID</th>
+                        <th>Acción</th>
+                        <th>Valor Previo</th>
+                        <th>Valor Nuevo</th>
+                        <th>IP Origen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for e in eventos %}
+                    <tr>
+                        <td>#{{ e.bitacora_id }}</td>
+                        <td style="white-space: nowrap;">{{ e.fecha_hora }}</td>
+                        <td>
+                            <strong>{{ e.nombre_usuario or 'Sistema' }}</strong><br>
+                            <small style="color: #666;">{{ e.rol_nombre or 'N/A' }}</small>
+                        </td>
+                        <td><code>{{ e.tabla }}</code></td>
+                        <td>{{ e.registro_id or '—' }}</td>
+                        <td>
+                            <span class="tag-accion tag-{{ e.accion }}">{{ e.accion }}</span>
+                        </td>
+                        <td>
+                            {% if e.valor_previo %}
+                                <pre>{{ e.valor_previo }}</pre>
+                            {% else %}
+                                <span style="color: #999;">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if e.valor_nuevo %}
+                                <pre>{{ e.valor_nuevo }}</pre>
+                            {% else %}
+                                <span style="color: #999;">—</span>
+                            {% endif %}
+                        </td>
+                        <td><small>{{ e.ip }}</small></td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="9" style="text-align: center; color: #7f8c8d; padding: 25px;">
+                            No se encontraron eventos con los filtros seleccionados.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

@@ -113,13 +113,22 @@
             </div>
 
         <!-- Opciones para Técnico de Informática -->
-        {% else %}
+        {% elif rol == 'tecnico_informatica' %}
             <div class="menu-grid">
-                <a href="{{ url_for('nomina.historial') }}" class="menu-btn btn-historial">
-                    ⚙️ Monitoreo y Auditoría de Periodos
+                <a href="{{ url_for('tecnico.usuarios') }}" class="menu-btn btn-analista">
+                    👥 Gestión de Usuarios y Contraseñas
                 </a>
-                <a href="{{ url_for('trabajadores.listar') }}" class="menu-btn btn-analista">
-                    👥 Expedientes y Asignación de Cuentas
+                <a href="{{ url_for('tecnico.bitacora') }}" class="menu-btn btn-directora">
+                    📜 Visor de Auditoría (Bitácora)
+                </a>
+                <a href="{{ url_for('tecnico.backup') }}" class="menu-btn btn-historial">
+                    💾 Generar y Descargar Respaldo SQL
+                </a>
+                <a href="{{ url_for('trabajadores.listar') }}" class="menu-btn btn-historial">
+                    📋 Consultar Fichas de Trabajadores
+                </a>
+                <a href="{{ url_for('organizacion.cargos') }}" class="menu-btn btn-directora">
+                    🏢 Estructura de Cargos y Departamentos
                 </a>
             </div>
         {% endif %}
