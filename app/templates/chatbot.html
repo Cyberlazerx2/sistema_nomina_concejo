@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Asistente Virtual - Concejo Municipal</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
+        .chat-container { max-width: 800px; margin: 0 auto; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: flex; flex-direction: column; height: 85vh; }
+        .chat-header { background: #2c3e50; color: white; padding: 15px 20px; border-radius: 8px 8px 0 0; display: flex; justify-content: space-between; align-items: center; }
+        .chat-header h2 { margin: 0; font-size: 17px; }
+        .chat-header p { margin: 3px 0 0 0; font-size: 12px; color: #bdc3c7; }
+        .btn-back { background: #34495e; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: bold; }
+        
+        .chat-messages { flex: 1; padding: 20px; overflow-y: auto; background: #fafbfc; display: flex; flex-direction: column; gap: 12px; }
+        
+        .msg-bubble { max-width: 75%; padding: 10px 14px; border-radius: 8px; font-size: 13px; line-height: 1.4; word-wrap: break-word; }
+        .msg-user { align-self: flex-end; background: #0056b3; color: white; border-bottom-right-radius: 2px; }
+        .msg-bot { align-self: flex-start; background: #e9ecef; color: #2c3e50; border-bottom-left-radius: 2px; border: 1px solid #dee2e6; }
+        .msg-time { font-size: 10px; margin-top: 4px; opacity: 0.7; text-align: right; }
+        
+        .quick-prompts { padding: 10px 20px; background: #f1f3f5; border-top: 1px solid #e2e6ea; display: flex; gap: 8px; flex-wrap: wrap; }
+        .btn-prompt { background: white; border: 1px solid #ced4da; padding: 5px 10px; border-radius: 15px; font-size: 11px; color: #495057; cursor: pointer; transition: 0.2s; }
+        .btn-prompt:hover { background: #e2e6ea; color: #212529; }
+        
+        .chat-input-area { padding: 15px 20px; background: white; border-top: 1px solid #eee; border-radius: 0 0 8px 8px; display: flex; gap: 10px; }
+        .chat-input { flex: 1; padding: 10px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; outline: none; }
+        .btn-send { background: #27ae60; color: white; border: none; padding: 0 20px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 13px; }
+        .btn-send:hover { background: #219653; }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <!-- Cabecera -->
+        <div class="chat-header">
+            <div>
+                <h2>💬 Asistente Virtual — Atención al Trabajador</h2>
+                <p>Concejo Municipal de Independencia | Funcionario: <strong>{{ trabajador.nombres }} {{ trabajador.apellidos }}</strong> ({{ trabajador.cargo_nombre }})</p>
+            </div>
+            <a href="{{ url_for('auth.dashboard') }}" class="btn-back">Regresar al Panel</a>
+        </div>
+
+        <!-- Area de Conversacion -->
+        <div class="chat-messages" id="chatArea">
+            <!-- Mensaje Inicial de Bienvenida -->
+            <div class="msg-bubble msg-bot">
+                <strong>Asistente Institucional:</strong><br>
+                ¡Hola, {{ trabajador.nombres }}! Soy el asistente informativo del Concejo Municipal. Puedo orientarte sobre la consulta de tus <strong>recibos de pago</strong>, el régimen de <strong>vacaciones</strong> según la LOTTT, la justificación de <strong>reposos médicos</strong> o cómo <strong>actualizar tus datos de contacto</strong>. ¿En qué puedo ayudarte hoy?
+                <div class="msg-time">Sistema</div>
+            </div>
+
+            <!-- Historial previo guardado -->
+            {% for h in historial %}
+                <div class="msg-bubble msg-user">
+                    {{ h.pregunta }}
+                    <div class="msg-time">{{ h.fecha_hora }}</div>
+                </div>
+                <div class="msg-bubble msg-bot">
+                    {{ h.respuesta|safe }}
+                    <div class="msg-time">{{ h.fecha_hora }}</div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <!-- Botones de Acceso Rapido -->
+        <div class="quick-prompts">
+            <span style="font-size: 11px; color: #6c757d; align-self: center;">Sugerencias:</span>
+            <button class="btn-prompt" onclick="enviarSugerencia('¿Dónde consulto mi recibo de pago?')">📄 Consultar Recibos</button>
+            <button class="btn-prompt" onclick="enviarSugerencia('¿Cómo son las vacaciones de ley?')">🏖️ Vacaciones LOTTT</button>
+            <button class="btn-prompt" onclick="enviarSugerencia('¿Cómo entrego un reposo médico?')">🏥 Reposo Médico</button>
+            <button class="btn-prompt" onclick="enviarSugerencia('Deseo actualizar mis datos de contacto')">👤 Actualizar Perfil</button>
+        </div>
+
+        <!-- Entrada de Texto -->
+        <form class="chat-input-area" id="chatForm" onsubmit="enviarMensaje(event)">
+            <input type="text" id="mensajeInput" class="chat-input" placeholder="Escribe tu consulta aquí..." autocomplete="off" required>
+            <button type="submit" class="btn-send">Enviar</button>
+        </form>
+    </div>
+
+    <script>
+        const chatArea = document.getElementById('chatArea');
+        const mensajeInput = document.getElementById('mensajeInput');
+
+        function scrollToBottom() {
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        scrollToBottom();
+
+        function enviarSugerencia(texto) {
+            mensajeInput.value = texto;
+            document.getElementById('chatForm').dispatchEvent(new Event('submit'));
+        }
+
+        async function enviarMensaje(e) {
+            e.preventDefault();
+            const mensaje = mensajeInput.value.trim();
+            if (!mensaje) return;
+
+            // 1. Mostrar burbuja del usuario inmediatamente
+            const userBubble = document.createElement('div');
+            userBubble.className = 'msg-bubble msg-user';
+            userBubble.innerHTML = mensaje + '<div class="msg-time">Ahora</div>';
+            chatArea.appendChild(userBubble);
+            mensajeInput.value = '';
+            scrollToBottom();
+
+            try {
+                // 2. Enviar POST asincrono a /chatbot/preguntar
+                const res = await fetch("{{ url_for('chatbot.preguntar') }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({ mensaje: mensaje })
+                });
+
+                const data = await res.json();
+
+                // 3. Mostrar respuesta del bot
+                const botBubble = document.createElement('div');
+                botBubble.className = 'msg-bubble msg-bot';
+                botBubble.innerHTML = (data.respuesta || data.error) + `<div class="msg-time">${data.fecha_hora || 'Ahora'}</div>`;
+                chatArea.appendChild(botBubble);
+                scrollToBottom();
+
+            } catch (err) {
+                const botBubble = document.createElement('div');
+                botBubble.className = 'msg-bubble msg-bot';
+                botBubble.innerHTML = 'Error de conexión con el servidor. Intente nuevamente.' + '<div class="msg-time">Error</div>';
+                chatArea.appendChild(botBubble);
+                scrollToBottom();
+            }
+        }
+    </script>
+</body>
+</html>

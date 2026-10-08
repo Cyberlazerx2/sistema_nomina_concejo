@@ -59,6 +59,10 @@ def create_app():
     # 8. Módulo Técnico de Informática (Soporte y Seguridad)
     from app.modules.tecnico.tecnico_routes import tecnico_bp
     app.register_blueprint(tecnico_bp, url_prefix='/tecnico')
+    
+    # 9. Asistente Virtual / Chatbot Institucional
+    from app.modules.chatbot.routes import chatbot_bp
+    app.register_blueprint(chatbot_bp, url_prefix='/chatbot')
 
     @app.route('/')
     def index():
