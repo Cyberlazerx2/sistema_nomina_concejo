@@ -17,6 +17,132 @@ def obtener_datos_trabajador(cursor, usuario_id):
     cursor.execute(sql, (usuario_id,))
     return cursor.fetchone()
 
+@portal_bp.route('/')
+def inicio():
+    if 'usuario_id' not in session or session.get('rol') != 'trabajador':
+        flash('Acceso denegado: El portal es exclusivo para trabajadores.', 'danger')
+        return redirect(url_for('auth.dashboard'))
+
+    conexion = get_db_connection()
+    try:
+        with conexion.cursor() as cursor:
+            # 1. Obtener expediente del trabajador asociado a la sesión
+            sql_trabajador = """
+                SELECT t.trabajador_id, t.cedula, t.nombres, t.apellidos, t.fecha_ingreso,
+                       t.telefono, t.correo, t.direccion, t.banco, t.numero_cuenta,
+                       c.nombre AS cargo_nombre, d.nombre AS departamento_nombre
+                FROM usuario u
+                INNER JOIN trabajador t ON u.trabajador_id = t.trabajador_id
+                LEFT JOIN cargo c ON t.cargo_id = c.cargo_id
+                LEFT JOIN departamento d ON c.departamento_id = d.departamento_id
+                WHERE u.usuario_id = %s;
+            """
+            cursor.execute(sql_trabajador, (session['usuario_id'],))
+            trabajador = cursor.fetchone()
+
+            if not trabajador:
+                flash('No se encontró ficha laboral asociada a su cuenta de usuario.', 'warning')
+                return redirect(url_for('auth.logout'))
+
+            # 2. Cómputo de Años de Servicio (Antigüedad)
+            hoy = datetime.date.today()
+            fecha_ing = trabajador['fecha_ingreso']
+            if fecha_ing:
+                anios_servicio = hoy.year - fecha_ing.year - ((hoy.month, hoy.day) < (fecha_ing.month, fecha_ing.day))
+                anios_servicio = max(0, anios_servicio)
+                anio_ingreso = fecha_ing.year
+            else:
+                anios_servicio = 0
+                anio_ingreso = hoy.year
+
+            # 3. Balance de Vacaciones según Art. 190 LOTTT
+            # 15 días hábiles base + 1 día adicional por cada año posterior (tope: 15 adicionales, total 30)
+            if anios_servicio >= 1:
+                dias_vacaciones_total = min(15 + (anios_servicio - 1), 30)
+            else:
+                dias_vacaciones_total = 0  # En curso del primer año
+
+            # Días disfrutados aprobados (tabla solicitud_vacaciones)
+            dias_disfrutados = 0
+            try:
+                cursor.execute("""
+                    SELECT COALESCE(SUM(dias_solicitados), 0) AS total_disfrutados
+                    FROM solicitud_vacaciones
+                    WHERE trabajador_id = %s AND estado = 'aprobada';
+                """, (trabajador['trabajador_id'],))
+                res_vac = cursor.fetchone()
+                if res_vac:
+                    dias_disfrutados = int(res_vac['total_disfrutados'])
+            except Exception:
+                dias_disfrutados = 0
+
+            dias_disponibles = max(0, dias_vacaciones_total - dias_disfrutados)
+            porcentaje_usado = int(round((dias_disfrutados / dias_vacaciones_total * 100))) if dias_vacaciones_total > 0 else 0
+
+            # 4. Último cobro quincenal o mensual registrado (nómina aprobada)
+            sql_ultimo_cobro = """
+                SELECT nt.neto_pagar, pn.descripcion, pn.fecha_fin
+                FROM nomina_trabajador nt
+                INNER JOIN periodo_nomina pn ON nt.periodo_id = pn.periodo_id
+                WHERE nt.trabajador_id = %s AND pn.estado IN ('aprobada', 'procesada_patria')
+                ORDER BY pn.fecha_fin DESC
+                LIMIT 1;
+            """
+            cursor.execute(sql_ultimo_cobro, (trabajador['trabajador_id'],))
+            ultimo_recibo = cursor.fetchone()
+
+            # 5. Próximo corte de pago ordinario
+            if hoy.day <= 15:
+                proximo_pago = f"15 de {hoy.strftime('%B')} de {hoy.year}"
+            else:
+                proximo_pago = f"30 de {hoy.strftime('%B')} de {hoy.year}"
+
+            # 6. Actividad reciente combinada (recibos + solicitudes de cambio)
+            actividad = []
+            if ultimo_recibo:
+                actividad.append({
+                    'etiqueta': f"Recibo emitido: {ultimo_recibo['descripcion']}",
+                    'detalle': f"Monto acreditado: Bs. {ultimo_recibo['neto_pagar']:,.2f}",
+                    'fecha': ultimo_recibo['fecha_fin'].strftime('%d/%m/%Y') if hasattr(ultimo_recibo['fecha_fin'], 'strftime') else str(ultimo_recibo['fecha_fin'])
+                })
+
+            try:
+                cursor.execute("""
+                    SELECT campo, valor_nuevo, estado, fecha_solicitud
+                    FROM solicitud_cambio_perfil
+                    WHERE trabajador_id = %s
+                    ORDER BY fecha_solicitud DESC
+                    LIMIT 2;
+                """, (trabajador['trabajador_id'],))
+                for sol in cursor.fetchall():
+                    actividad.append({
+                        'etiqueta': f"Actualización de {sol['campo'].capitalize()}",
+                        'detalle': f"Estatus de trámite: {sol['estado'].capitalize()}",
+                        'fecha': sol['fecha_solicitud'].strftime('%d/%m/%Y') if hasattr(sol['fecha_solicitud'], 'strftime') else str(sol['fecha_solicitud'])
+                    })
+            except Exception:
+                pass
+
+            # Iniciales para el avatar
+            iniciales = (trabajador['nombres'][:1] + trabajador['apellidos'][:1]).upper() if trabajador['nombres'] and trabajador['apellidos'] else "FN"
+
+            return render_template(
+                'portal/portal_inicio.html',
+                trabajador=trabajador,
+                iniciales=iniciales,
+                anios_servicio=anios_servicio,
+                anio_ingreso=anio_ingreso,
+                dias_vacaciones_total=dias_vacaciones_total,
+                dias_disfrutados=dias_disfrutados,
+                dias_disponibles=dias_disponibles,
+                porcentaje_usado=porcentaje_usado,
+                ultimo_recibo=ultimo_recibo,
+                proximo_pago=proximo_pago,
+                actividad=actividad
+            )
+    finally:
+        conexion.close()
+
 # -------------------------------------------------------------------------
 # 1. LISTA DE RECIBOS DE PAGO DEL TRABAJADOR (Art. 106 LOTTT)
 # Solo muestra nóminas en estado 'aprobada' o 'procesada_patria'

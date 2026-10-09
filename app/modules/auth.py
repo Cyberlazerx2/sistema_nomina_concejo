@@ -64,14 +64,81 @@ def login():
 
 @auth_bp.route('/dashboard')
 def dashboard():
-    # Proteccion de ruta: solo pasa quien tenga sesion activa
     if 'usuario_id' not in session:
-        flash('Debe iniciar sesión para acceder al sistema.', 'warning')
         return redirect(url_for('auth.login'))
 
-    return render_template('dashboard.html', 
-                           usuario=session.get('nombre_usuario'), 
-                           rol=session.get('rol'))
+    rol = session.get('rol')
+
+    # Si es trabajador, entra a su portal integral
+    if rol == 'trabajador':
+        return redirect(url_for('portal.inicio'))
+
+    conexion = get_db_connection()
+    try:
+        with conexion.cursor() as cursor:
+            # 1. Total de trabajadores activos en nómina
+            cursor.execute("SELECT COUNT(*) AS total FROM trabajador WHERE activo = true;")
+            total_trabajadores = cursor.fetchone()['total']
+
+            # 2. Nóminas pendientes por validar o aprobar
+            cursor.execute("""
+                SELECT COUNT(*) AS total FROM periodo_nomina 
+                WHERE estado IN ('borrador', 'revisada');
+            """)
+            nominas_pendientes = cursor.fetchone()['total']
+
+            # 3. Gasto acumulado en nóminas aprobadas durante el ejercicio fiscal
+            cursor.execute("""
+                SELECT COALESCE(SUM(total_neto), 0) AS total_gastado,
+                       COALESCE(SUM(total_asignaciones), 0) AS total_bruto
+                FROM periodo_nomina 
+                WHERE estado IN ('aprobada', 'procesada_patria');
+            """)
+            finanzas = cursor.fetchone()
+            total_gastado = finanzas['total_gastado']
+
+            # 4. Conteos específicos para los filtros rápidos de la tabla
+            cursor.execute("""
+                SELECT 
+                    COUNT(*) AS total_todos,
+                    SUM(CASE WHEN estado = 'borrador' THEN 1 ELSE 0 END) AS total_borrador,
+                    SUM(CASE WHEN estado = 'revisada' THEN 1 ELSE 0 END) AS total_revisada,
+                    SUM(CASE WHEN estado = 'aprobada' THEN 1 ELSE 0 END) AS total_aprobada
+                FROM periodo_nomina;
+            """)
+            conteos = cursor.fetchone()
+
+            # 5. Últimas nóminas procesadas (máximo 10)
+            cursor.execute("""
+                SELECT p.periodo_id, p.descripcion, p.fecha_inicio, p.fecha_fin,
+                       p.tipo_nomina, p.periodicidad, p.total_asignaciones,
+                       p.total_deducciones, p.total_neto, p.estado
+                FROM periodo_nomina p
+                ORDER BY p.periodo_id DESC
+                LIMIT 10;
+            """)
+            ultimas_nominas = cursor.fetchall()
+
+            # Contar trabajadores incluidos en cada periodo para la columna "Personal"
+            for nom in ultimas_nominas:
+                cursor.execute("""
+                    SELECT COUNT(*) AS cant FROM nomina_trabajador 
+                    WHERE periodo_id = %s;
+                """, (nom['periodo_id'],))
+                nom['cantidad_trabajadores'] = cursor.fetchone()['cant']
+                nom['analista_user'] = 'RRHH'  # Valor por defecto seguro
+
+            return render_template(
+                'dashboard.html',
+                rol=rol,
+                total_trabajadores=total_trabajadores,
+                nominas_pendientes=nominas_pendientes,
+                total_gastado=total_gastado,
+                conteos=conteos,
+                nominas=ultimas_nominas
+            )
+    finally:
+        conexion.close()
 
 @auth_bp.route('/logout')
 def logout():

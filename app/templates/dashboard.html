@@ -1,137 +1,247 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel de Control - Concejo Municipal</title>
-    <style>
-        body { font-family: Arial, sans-serif; background-color: #ecf0f1; margin: 0; padding: 20px; }
-        .header { background: white; padding: 20px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .btn-logout { background-color: #e74c3c; color: white; padding: 8px 15px; text-decoration: none; border-radius: 4px; font-weight: bold; }
-        .card { background: white; padding: 25px; margin-top: 20px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .tag-rol { background: #2980b9; color: white; padding: 4px 8px; border-radius: 4px; font-size: 13px; text-transform: uppercase; }
-        .menu-grid { display: flex; gap: 15px; margin-top: 20px; flex-wrap: wrap; }
-        .menu-btn { display: inline-block; padding: 12px 20px; border-radius: 5px; color: white; text-decoration: none; font-weight: bold; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .btn-analista { background-color: #0056b3; }
-        .btn-directora { background-color: #27ae60; }
-        .btn-presidente { background-color: #8e44ad; }
-        .btn-historial { background-color: #34495e; }
-        .menu-btn:hover { opacity: 0.9; }
-        .alert { padding: 10px; border-radius: 4px; margin-bottom: 15px; font-size: 13px; }
-        .alert-success { background-color: #d4edda; color: #155724; }
-        .alert-warning { background-color: #fff3cd; color: #856404; }
-        .alert-danger { background-color: #f8d7da; color: #721c24; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h2>Panel de Control - Concejo Municipal</h2>
-        <div>
-            Usuario: <strong>{{ usuario }}</strong> | Rol: <span class="tag-rol">{{ rol }}</span>
-            <a href="{{ url_for('auth.logout') }}" class="btn-logout" style="margin-left: 15px;">Cerrar Sesión</a>
+{% extends "base.html" %}
+
+{% block title %}Tablero Principal{% endblock %}
+
+{% block content %}
+<!-- Cabecera de Página -->
+<div class="page-header d-print-none mb-4">
+    <div class="row align-items-center">
+        <div class="col">
+            <h2 class="page-title text-dark">
+                Panel de Control Gerencial
+            </h2>
+            <div class="text-muted mt-1">
+                Concejo Municipal de Independencia · Ejercicio Fiscal 2026 · Resumen institucional de nómina
+            </div>
+        </div>
+        <div class="col-auto ms-auto d-print-none">
+            {% if rol == 'analista_rrhh' %}
+            <a href="{{ url_for('nomina.generar') }}" class="btn btn-primary d-inline-flex align-items-center gap-1">
+                <span>➕</span> Elaborar Pre-Nómina
+            </a>
+            {% endif %}
+            {% if rol == 'tecnico_informatica' %}
+            <a href="{{ url_for('tecnico.backup') }}" class="btn btn-outline-success d-inline-flex align-items-center gap-1">
+                <span>💾</span> Respaldo Inmediato
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- 1. SECCIÓN DE TARJETAS KPI (Adaptado de kpi-cards.tsx) -->
+<div class="row row-deck row-cards mb-4">
+    <!-- KPI 1: Gasto de Nómina Ejecutado -->
+    <div class="col-sm-6 col-xl-3">
+        <div class="card card-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <span class="avatar bg-blue-lt me-3">💰</span>
+                    <div>
+                        <div class="text-muted small text-uppercase fw-bold">Gasto Total Ejecutado</div>
+                        <div class="fs-2 fw-bold text-dark">Bs. {{ "{:,.2f}".format(total_gastado) }}</div>
+                    </div>
+                </div>
+                <div class="mt-3 text-muted small d-flex justify-content-between align-items-center">
+                    <span>Nóminas aprobadas 2026</span>
+                    <span class="badge bg-green-lt">Al día</span>
+                </div>
+            </div>
         </div>
     </div>
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="alert alert-{{ category }}" style="margin-top: 20px;">{{ message }}</div>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
-
-    <div class="card">
-        <h3>Bandeja Operativa</h3>
-        <p>Bienvenido al módulo de gestión. Su perfil institucional activo es: <strong>{{ rol }}</strong>.</p>
-
-        <!-- Opciones para Analista de RRHH -->
-        {% if rol == 'analista_rrhh' %}
-            <div class="menu-grid">
-                <a href="{{ url_for('asistencia.listar') }}" class="menu-btn btn-directora">
-                    📅 Control y Novedades de Asistencia
-                </a>
-                <a href="{{ url_for('nomina.generar') }}" class="menu-btn btn-analista">
-                    📋 Elaborar y Precalcular Nómina Quincenal
-                </a>
-                <a href="{{ url_for('nomina.historial') }}" class="menu-btn btn-historial">
-                    📂 Consultar Historial de Periodos
-                </a>
-                <a href="{{ url_for('trabajadores.listar') }}" class="menu-btn btn-historial">
-                    👥 Consultar Plantilla de Trabajadores
-                </a>
+    <!-- KPI 2: Trabajadores Activos -->
+    <div class="col-sm-6 col-xl-3">
+        <div class="card card-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <span class="avatar bg-green-lt me-3">👥</span>
+                    <div>
+                        <div class="text-muted small text-uppercase fw-bold">Plantilla Activa</div>
+                        <div class="fs-2 fw-bold text-dark">{{ total_trabajadores }} Funcionarios</div>
+                    </div>
+                </div>
+                <div class="mt-3 text-muted small d-flex justify-content-between align-items-center">
+                    <span>En nómina regular</span>
+                    <a href="{{ url_for('trabajadores.listar') }}" class="text-primary text-decoration-none fw-bold">Ver lista →</a>
+                </div>
             </div>
-
-        <!-- Opciones para Directora de RRHH -->
-        {% elif rol == 'directora_rrhh' %}
-            <div class="menu-grid">
-                <a href="{{ url_for('asistencia.listar') }}" class="menu-btn btn-historial">
-                    📅 Supervisión de Asistencias
-                </a>
-                <a href="{{ url_for('nomina.generar') }}" class="menu-btn btn-analista">
-                    📋 Elaborar Pre-nómina (Excepcional)
-                </a>
-                <a href="{{ url_for('nomina.historial') }}" class="menu-btn btn-directora">
-                    🔍 Revisar Nóminas Pendientes y Validar
-                </a>
-                <a href="{{ url_for('nomina.historial') }}" class="menu-btn btn-presidente">
-                    📥 Dispersión Bancaria (Exportar TXT Patria)
-                </a>
-                <a href="{{ url_for('trabajadores.listar') }}" class="menu-btn btn-historial">
-                    👥 Gestión de Trabajadores y Expedientes
-                </a>
-                <a href="{{ url_for('trabajadores.solicitudes') }}" class="menu-btn btn-analista">
-                    📬 Solicitudes de Perfil de Trabajadores
-                </a>
-                <a href="{{ url_for('organizacion.cargos') }}" class="menu-btn btn-directora">
-                    🏢 Gestión de Cargos y Departamentos
-                </a>
-                <a href="{{ url_for('config.conceptos') }}" class="menu-btn btn-directora">
-                    ⚙️ Parametrizar Deducciones y Asignaciones
-                </a>
-            </div>
-
-        <!-- Opciones para Presidente del Concejo -->
-        {% elif rol == 'presidente' %}
-            <div class="menu-grid">
-                <a href="{{ url_for('nomina.historial') }}" class="menu-btn btn-presidente">
-                    🔒 Bandeja de Aprobación Institucional de Nóminas
-                </a>
-            </div>
-
-        <!-- Opciones para Trabajador Regular -->
-        {% elif rol == 'trabajador' %}
-            <div class="menu-grid">
-                <a href="{{ url_for('portal.recibos') }}" class="menu-btn btn-analista">
-                    📄 Consultar Mis Recibos de Pago (LOTTT 106)
-                </a>
-                <a href="{{ url_for('portal.perfil') }}" class="menu-btn btn-directora">
-                    👤 Mi Perfil y Actualización de Contacto
-                </a>
-                <a href="{{ url_for('chatbot.index') }}" class="menu-btn btn-historial">
-                    💬 Asistente Virtual (Chatbot)
-                </a>
-            </div>
-
-        <!-- Opciones para Técnico de Informática -->
-        {% elif rol == 'tecnico_informatica' %}
-            <div class="menu-grid">
-                <a href="{{ url_for('tecnico.usuarios') }}" class="menu-btn btn-analista">
-                    👥 Gestión de Usuarios y Contraseñas
-                </a>
-                <a href="{{ url_for('tecnico.bitacora') }}" class="menu-btn btn-directora">
-                    📜 Visor de Auditoría (Bitácora)
-                </a>
-                <a href="{{ url_for('tecnico.backup') }}" class="menu-btn btn-historial">
-                    💾 Generar y Descargar Respaldo SQL
-                </a>
-                <a href="{{ url_for('trabajadores.listar') }}" class="menu-btn btn-historial">
-                    📋 Consultar Fichas de Trabajadores
-                </a>
-                <a href="{{ url_for('organizacion.cargos') }}" class="menu-btn btn-directora">
-                    🏢 Estructura de Cargos y Departamentos
-                </a>
-            </div>
-        {% endif %}
+        </div>
     </div>
-</body>
-</html>
+
+    <!-- KPI 3: Aprobaciones Pendientes -->
+    <div class="col-sm-6 col-xl-3">
+        <div class="card card-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <span class="avatar {{ 'bg-yellow-lt' if nominas_pendientes > 0 else 'bg-secondary-lt' }} me-3">⏳</span>
+                    <div>
+                        <div class="text-muted small text-uppercase fw-bold">Flujo Pendiente</div>
+                        <div class="fs-2 fw-bold text-dark">{{ nominas_pendientes }} Periodo(s)</div>
+                    </div>
+                </div>
+                <div class="mt-3 text-muted small d-flex justify-content-between align-items-center">
+                    <span>Requieren validación</span>
+                    {% if nominas_pendientes > 0 %}
+                    <span class="badge bg-warning text-dark fw-bold">Acción requerida</span>
+                    {% else %}
+                    <span class="badge bg-secondary-lt">Al corriente</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI 4: Próximo Cierre Quincenal -->
+    <div class="col-sm-6 col-xl-3">
+        <div class="card card-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <span class="avatar bg-purple-lt me-3">📅</span>
+                    <div>
+                        <div class="text-muted small text-uppercase fw-bold">Régimen Quincenal</div>
+                        <div class="fs-2 fw-bold text-dark">Días 15 y 30</div>
+                    </div>
+                </div>
+                <div class="mt-3 text-muted small d-flex justify-content-between align-items-center">
+                    <span>Corte de Asistencia</span>
+                    <a href="{{ url_for('asistencia.listar') }}" class="text-purple text-decoration-none fw-bold">Ver asistencia →</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 2. TABLA DE PERIODOS RECIENTES (Adaptado de payroll-table.tsx y status-badge.tsx) -->
+<div class="card">
+    <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div>
+            <h3 class="card-title mb-0">Periodos de Nómina Recientes</h3>
+            <p class="text-muted small mb-0">Historial de emisiones y avance del ciclo de aprobación</p>
+        </div>
+
+        <!-- Filtros interactivos con conteos dinámicos -->
+        <div class="d-flex align-items-center gap-2">
+            <div class="btn-group" role="group" aria-label="Filtro de estados">
+                <button type="button" class="btn btn-sm btn-outline-primary active" onclick="filtrarEstado('todos', this)">
+                    Todos <span class="badge bg-blue ms-1">{{ conteos.total_todos or 0 }}</span>
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="filtrarEstado('borrador', this)">
+                    Borrador <span class="badge bg-secondary ms-1">{{ conteos.total_borrador or 0 }}</span>
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="filtrarEstado('revisada', this)">
+                    Revisada <span class="badge bg-info ms-1">{{ conteos.total_revisada or 0 }}</span>
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="filtrarEstado('aprobada', this)">
+                    Aprobada <span class="badge bg-success ms-1">{{ conteos.total_aprobada or 0 }}</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-striped table-hover" id="tablaNominas">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Periodo / Descripción</th>
+                    <th>Tipo Nómina</th>
+                    <th class="text-center">Personal</th>
+                    <th class="text-end">Total Bruto</th>
+                    <th class="text-end">Deducciones</th>
+                    <th class="text-end">Neto a Pagar</th>
+                    <th>Elaborado Por</th>
+                    <th>Estado</th>
+                    <th class="w-1 text-center">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for n in nominas %}
+                <tr class="fila-nomina" data-estado="{{ n.estado }}">
+                    <td class="font-monospace fw-bold text-muted">#{{ n.periodo_id }}</td>
+                    <td>
+                        <div class="fw-bold text-dark">{{ n.descripcion }}</div>
+                        <div class="text-muted small">{{ n.fecha_inicio }} al {{ n.fecha_fin }}</div>
+                    </td>
+                    <td>
+                        <span class="badge bg-secondary-lt text-uppercase">{{ n.tipo_nomina|replace('_', ' ') }}</span>
+                    </td>
+                    <td class="text-center font-monospace">{{ n.cantidad_trabajadores }}</td>
+                    <td class="text-end font-monospace text-muted">Bs. {{ "{:,.2f}".format(n.total_asignaciones) }}</td>
+                    <td class="text-end font-monospace text-danger">−Bs. {{ "{:,.2f}".format(n.total_deducciones) }}</td>
+                    <td class="text-end font-monospace fw-bold text-success fs-4">Bs. {{ "{:,.2f}".format(n.total_neto) }}</td>
+                    <td class="text-muted small">{{ n.analista_user or 'Sistema' }}</td>
+                    <td>
+                        <!-- Status Badge con Status Dot integrado -->
+                        {% if n.estado == 'borrador' %}
+                            <span class="badge bg-warning-lt text-uppercase">
+                                <span class="badge-dot bg-warning me-1"></span>Borrador
+                            </span>
+                        {% elif n.estado == 'revisada' %}
+                            <span class="badge bg-info-lt text-uppercase">
+                                <span class="badge-dot bg-info me-1"></span>Revisada
+                            </span>
+                        {% elif n.estado == 'aprobada' %}
+                            <span class="badge bg-success-lt text-uppercase">
+                                <span class="badge-dot bg-success me-1"></span>Aprobada
+                            </span>
+                        {% elif n.estado == 'rechazada' %}
+                            <span class="badge bg-danger-lt text-uppercase">
+                                <span class="badge-dot bg-danger me-1"></span>Devuelta
+                            </span>
+                        {% else %}
+                            <span class="badge bg-purple-lt text-uppercase">
+                                <span class="badge-dot bg-purple me-1"></span>{{ n.estado|replace('_', ' ') }}
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <a href="{{ url_for('nomina.detalle', periodo_id=n.periodo_id) }}" class="btn btn-sm btn-outline-primary">
+                            Revisar
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="10" class="text-center text-muted py-4">
+                        No hay periodos de nómina registrados en el sistema.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card-footer d-flex align-items-center justify-content-between">
+        <p class="m-0 text-muted small">
+            Mostrando los últimos <strong>{{ nominas|length }}</strong> periodos generados
+        </p>
+        <a href="{{ url_for('nomina.historial') }}" class="btn btn-sm btn-link text-primary fw-bold text-decoration-none">
+            Ver historial completo de nóminas →
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Filtrado dinámico por estado sin recargar la página (reemplaza el useState de React)
+    function filtrarEstado(estado, boton) {
+        // Actualizar botón activo
+        const botones = boton.parentElement.querySelectorAll('.btn');
+        botones.forEach(b => b.classList.remove('active'));
+        boton.classList.add('active');
+
+        // Filtrar filas de la tabla
+        const filas = document.querySelectorAll('.fila-nomina');
+        filas.forEach(fila => {
+            const estadoFila = fila.getAttribute('data-estado');
+            if (estado === 'todos' || estadoFila === estado) {
+                fila.style.display = '';
+            } else {
+                fila.style.display = 'none';
+            }
+        });
+    }
+</script>
+{% endblock %}
