@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+    <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
+    <title>{% block title %}Concejo Municipal de Independencia{% endblock %} - Sistema de Nómina</title>
+    <!-- Estilos locales de Tabler (Sin CDNs externas) -->
+    <link href="{{ url_for('static', filename='css/tabler.min.css') }}" rel="stylesheet"/>
+    <style>
+        /* Personalización institucional */
+        :root {
+            --tblr-primary: #1e3a8a;
+            --tblr-primary-rgb: 30, 58, 138;
+        }
+        .navbar-vertical {
+            background-color: #0f172a;
+        }
+        .navbar-vertical .navbar-brand, 
+        .navbar-vertical .nav-link {
+            color: #e2e8f0;
+        }
+        .navbar-vertical .nav-link.active,
+        .navbar-vertical .nav-link:hover {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.08);
+        }
+        .badge-borrador { background-color: #f59e0b; color: white; }
+        .badge-revisada { background-color: #0284c7; color: white; }
+        .badge-aprobada { background-color: #10b981; color: white; }
+        .badge-rechazada { background-color: #ef4444; color: white; }
+        .badge-procesada_patria { background-color: #6366f1; color: white; }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <!-- Barra Lateral de Navegación por Rol -->
+        <aside class="navbar navbar-vertical navbar-expand-lg navbar-dark">
+            <div class="container-fluid">
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu" aria-controls="sidebar-menu" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="navbar-brand navbar-brand-autodark px-3 py-3 text-start">
+                    <div class="fw-bold fs-3 text-white">CONCEJO MUNICIPAL</div>
+                    <div class="text-muted fs-5">INDEPENDENCIA · YARACUY</div>
+                    <div class="badge bg-blue-lt mt-1">RIF G-20006055-7</div>
+                </div>
+
+                <div class="collapse navbar-collapse" id="sidebar-menu">
+                    <ul class="navbar-nav pt-lg-3">
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('auth.dashboard') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">🏠</span>
+                                <span class="nav-link-title">Inicio / Panel</span>
+                            </a>
+                        </li>
+
+                        <!-- Opciones: Analista de RRHH -->
+                        {% if session.get('rol') == 'analista_rrhh' %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('asistencia.listar') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">📅</span>
+                                <span class="nav-link-title">Control de Asistencia</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('nomina.generar') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">📋</span>
+                                <span class="nav-link-title">Elaborar Nómina</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('nomina.historial') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">📂</span>
+                                <span class="nav-link-title">Historial de Nóminas</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('trabajadores.listar') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">👥</span>
+                                <span class="nav-link-title">Plantilla de Personal</span>
+                            </a>
+                        </li>
+
+                        <!-- Opciones: Directora de RRHH -->
+                        {% elif session.get('rol') == 'directora_rrhh' %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('nomina.historial') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">🔍</span>
+                                <span class="nav-link-title">Revisión de Nóminas</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('trabajadores.listar') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">👥</span>
+                                <span class="nav-link-title">Gestión de Personal</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('trabajadores.solicitudes') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">📬</span>
+                                <span class="nav-link-title">Solicitudes de Perfil</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('asistencia.listar') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">📅</span>
+                                <span class="nav-link-title">Supervisión Asistencia</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('config.conceptos') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">⚙️</span>
+                                <span class="nav-link-title">Conceptos Salariales</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('organizacion.cargos') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">🏢</span>
+                                <span class="nav-link-title">Cargos y Departamentos</span>
+                            </a>
+                        </li>
+
+                        <!-- Opciones: Presidente del Concejo -->
+                        {% elif session.get('rol') == 'presidente' %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('nomina.historial') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">🔒</span>
+                                <span class="nav-link-title">Aprobación de Nómina</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('trabajadores.listar') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">👥</span>
+                                <span class="nav-link-title">Consulta de Personal</span>
+                            </a>
+                        </li>
+
+                        <!-- Opciones: Técnico de Informática -->
+                        {% elif session.get('rol') == 'tecnico_informatica' %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('tecnico.usuarios') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">👤</span>
+                                <span class="nav-link-title">Cuentas y Seguridad</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('tecnico.bitacora') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">📜</span>
+                                <span class="nav-link-title">Bitácora de Auditoría</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('tecnico.backup') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">💾</span>
+                                <span class="nav-link-title">Respaldo SQL</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('organizacion.cargos') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">🏢</span>
+                                <span class="nav-link-title">Estructura Orgánica</span>
+                            </a>
+                        </li>
+
+                        <!-- Opciones: Trabajador Regular -->
+                        {% elif session.get('rol') == 'trabajador' %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('portal.recibos') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">📄</span>
+                                <span class="nav-link-title">Mis Recibos de Pago</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('portal.perfil') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">👤</span>
+                                <span class="nav-link-title">Mi Ficha y Contacto</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('chatbot.index') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">💬</span>
+                                <span class="nav-link-title">Asistente Virtual</span>
+                            </a>
+                        </li>
+                        {% endif %}
+
+                        <li class="nav-item mt-3">
+                            <a class="nav-link text-danger" href="{{ url_for('auth.logout') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">🚪</span>
+                                <span class="nav-link-title">Cerrar Sesión</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Cabecera Superior y Contenido Principal -->
+        <div class="page-wrapper">
+            <header class="navbar navbar-expand-md navbar-light d-none d-lg-flex d-print-none border-bottom">
+                <div class="container-xl">
+                    <div class="navbar-nav flex-row order-md-last ms-auto">
+                        <div class="nav-item d-flex align-items-center">
+                            <span class="avatar avatar-sm bg-blue-lt me-2">
+                                {{ (session.get('nombre_usuario') or 'U')[:2]|upper }}
+                            </span>
+                            <div class="d-none d-xl-block ps-1 text-start">
+                                <div class="fw-bold">{{ session.get('nombre_usuario') }}</div>
+                                <div class="small text-muted text-uppercase">{{ session.get('rol')|replace('_', ' ') }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <main class="page-body">
+                <div class="container-xl">
+                    <!-- Mensajes Flash del Sistema -->
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ 'danger' if category == 'danger' else ('warning' if category == 'warning' else 'success') }} alert-dismissible fade show" role="alert">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+
+                    <!-- Bloque de Contenido Inyectado -->
+                    {% block content %}{% endblock %}
+                </div>
+            </main>
+
+            <footer class="footer footer-transparent d-print-none py-3 border-top mt-auto">
+                <div class="container-xl text-center text-muted fs-5">
+                    Concejo Municipal del Municipio Independencia · Estado Yaracuy · Sistema Integrado de Nómina y Talento Humano
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Scripts de Tabler (Locales) -->
+    <script src="{{ url_for('static', filename='js/tabler.min.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

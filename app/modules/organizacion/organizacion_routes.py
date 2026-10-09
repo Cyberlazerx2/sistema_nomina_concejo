@@ -36,7 +36,7 @@ def departamentos():
             """
             cursor.execute(sql)
             lista_deptos = cursor.fetchall()
-            return render_template('organizacion_departamentos.html', departamentos=lista_deptos)
+            return render_template('organizacion/organizacion_departamentos.html', departamentos=lista_deptos)
     finally:
         conexion.close()
 
@@ -54,7 +54,7 @@ def nuevo_departamento():
 
         if not nombre:
             flash('El nombre del departamento es obligatorio.', 'warning')
-            return render_template('organizacion_departamento_form.html')
+            return render_template('organizacion/organizacion_departamento_form.html')
 
         conexion = get_db_connection()
         try:
@@ -63,7 +63,7 @@ def nuevo_departamento():
                 cursor.execute("SELECT departamento_id FROM departamento WHERE nombre = %s;", (nombre,))
                 if cursor.fetchone():
                     flash(f"El departamento '{nombre}' ya se encuentra registrado.", 'warning')
-                    return render_template('organizacion_departamento_form.html')
+                    return render_template('organizacion/organizacion_departamento_form.html')
 
                 # Insercion del departamento
                 sql_insert = "INSERT INTO departamento (nombre, activo) VALUES (%s, true);"
@@ -94,7 +94,7 @@ def nuevo_departamento():
         finally:
             conexion.close()
 
-    return render_template('organizacion_departamento_form.html')
+    return render_template('organizacion/organizacion_departamento_form.html')
 
 # -------------------------------------------------------------------------
 # 3. LISTAR CARGOS CON SU DEPARTAMENTO
@@ -117,7 +117,7 @@ def cargos():
             """
             cursor.execute(sql)
             lista_cargos = cursor.fetchall()
-            return render_template('organizacion_cargos.html', cargos=lista_cargos)
+            return render_template('organizacion/organizacion_cargos.html', cargos=lista_cargos)
     finally:
         conexion.close()
 
@@ -142,7 +142,7 @@ def nuevo_cargo():
                     flash('Todos los campos del cargo son obligatorios.', 'warning')
                     cursor.execute("SELECT departamento_id, nombre FROM departamento WHERE activo = true ORDER BY nombre ASC;")
                     departamentos_activos = cursor.fetchall()
-                    return render_template('organizacion_cargo_form.html', modo='crear', departamentos=departamentos_activos)
+                    return render_template('organizacion/organizacion_cargo_form.html', modo='crear', departamentos=departamentos_activos)
 
                 try:
                     sueldo_base = Decimal(sueldo_base_raw)
@@ -150,7 +150,7 @@ def nuevo_cargo():
                     flash('El sueldo base de referencia debe ser un valor numérico válido.', 'danger')
                     cursor.execute("SELECT departamento_id, nombre FROM departamento WHERE activo = true ORDER BY nombre ASC;")
                     departamentos_activos = cursor.fetchall()
-                    return render_template('organizacion_cargo_form.html', modo='crear', departamentos=departamentos_activos)
+                    return render_template('organizacion/organizacion_cargo_form.html', modo='crear', departamentos=departamentos_activos)
 
                 sql_insert = """
                     INSERT INTO cargo (departamento_id, nombre, sueldo_base, activo)
@@ -185,7 +185,7 @@ def nuevo_cargo():
 
             cursor.execute("SELECT departamento_id, nombre FROM departamento WHERE activo = true ORDER BY nombre ASC;")
             departamentos_activos = cursor.fetchall()
-            return render_template('organizacion_cargo_form.html', modo='crear', departamentos=departamentos_activos)
+            return render_template('organizacion/organizacion_cargo_form.html', modo='crear', departamentos=departamentos_activos)
     except Exception as e:
         conexion.rollback()
         flash(f'Error al crear cargo: {e}', 'danger')
@@ -221,7 +221,7 @@ def editar_cargo(id):
                     flash('Todos los campos son obligatorios.', 'warning')
                     cursor.execute("SELECT departamento_id, nombre FROM departamento WHERE activo = true ORDER BY nombre ASC;")
                     deptos = cursor.fetchall()
-                    return render_template('organizacion_cargo_form.html', modo='editar', cargo=valor_previo, departamentos=deptos)
+                    return render_template('organizacion/organizacion_cargo_form.html', modo='editar', cargo=valor_previo, departamentos=deptos)
 
                 try:
                     sueldo_base = Decimal(sueldo_base_raw)
@@ -229,7 +229,7 @@ def editar_cargo(id):
                     flash('El sueldo base de referencia debe ser numérico.', 'danger')
                     cursor.execute("SELECT departamento_id, nombre FROM departamento WHERE activo = true ORDER BY nombre ASC;")
                     deptos = cursor.fetchall()
-                    return render_template('organizacion_cargo_form.html', modo='editar', cargo=valor_previo, departamentos=deptos)
+                    return render_template('organizacion/organizacion_cargo_form.html', modo='editar', cargo=valor_previo, departamentos=deptos)
 
                 sql_update = """
                     UPDATE cargo 
@@ -262,7 +262,7 @@ def editar_cargo(id):
 
             cursor.execute("SELECT departamento_id, nombre FROM departamento WHERE activo = true ORDER BY nombre ASC;")
             departamentos_activos = cursor.fetchall()
-            return render_template('organizacion_cargo_form.html', modo='editar', cargo=valor_previo, departamentos=departamentos_activos)
+            return render_template('organizacion/organizacion_cargo_form.html', modo='editar', cargo=valor_previo, departamentos=departamentos_activos)
     except Exception as e:
         conexion.rollback()
         flash(f'Error al modificar cargo: {e}', 'danger')

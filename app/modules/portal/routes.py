@@ -47,7 +47,7 @@ def recibos():
             cursor.execute(sql_recibos, (trabajador['trabajador_id'],))
             recibos_lista = cursor.fetchall()
 
-            return render_template('portal_recibos.html', trabajador=trabajador, recibos=recibos_lista)
+            return render_template('portal/portal_recibos.html', trabajador=trabajador, recibos=recibos_lista)
     finally:
         conexion.close()
 
@@ -97,7 +97,7 @@ def recibo_detalle(periodo_id):
             asignaciones = [d for d in detalles if d['tipo'] == 'asignacion']
             deducciones = [d for d in detalles if d['tipo'] == 'deduccion']
 
-            return render_template('portal_recibo_detalle.html', 
+            return render_template('portal/portal_recibo_detalle.html', 
                                    trabajador=trabajador, 
                                    recibo=recibo, 
                                    asignaciones=asignaciones, 
@@ -173,6 +173,6 @@ def perfil():
             """, (trabajador['trabajador_id'],))
             solicitudes = cursor.fetchall()
 
-            return render_template('portal_perfil.html', trabajador=trabajador, solicitudes=solicitudes)
+            return render_template('portal/portal_perfil.html', trabajador=trabajador, solicitudes=solicitudes)
     finally:
         conexion.close()

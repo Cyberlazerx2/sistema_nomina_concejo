@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Historial de Periodos de Nómina{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none mb-4">
+    <div class="row align-items-center">
+        <div class="col">
+            <h2 class="page-title text-dark">
+                Historial de Nóminas Procesadas
+            </h2>
+            <div class="text-muted mt-1">
+                Consulta de periodos elaborados, ciclo de aprobación de 3 pasos y dispersión al Sistema Patria.
+            </div>
+        </div>
+        <div class="col-auto ms-auto d-print-none">
+            {% if session.get('rol') == 'analista_rrhh' %}
+            <a href="{{ url_for('nomina.generar') }}" class="btn btn-primary">
+                + Elaborar Nueva Pre-Nómina
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Relación de Periodos Registrados</h3>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-striped">
+            <thead>
+                <tr>
+                    <th>N°</th>
+                    <th>Descripción / Lapso</th>
+                    <th>Tipo Nómina</th>
+                    <th>Periodicidad</th>
+                    <th>Total Neto</th>
+                    <th>Estado de Aprobación</th>
+                    <th class="w-1 text-center">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in periodos %}
+                <tr>
+                    <td class="text-muted fw-bold">#{{ p.periodo_id }}</td>
+                    <td>
+                        <div class="fw-bold text-dark">{{ p.descripcion }}</div>
+                        <div class="text-muted small">{{ p.fecha_inicio }} al {{ p.fecha_fin }}</div>
+                    </td>
+                    <td>
+                        <span class="badge bg-secondary-lt text-uppercase">{{ p.tipo_nomina|replace('_', ' ') }}</span>
+                    </td>
+                    <td>{{ p.periodicidad|capitalize }}</td>
+                    <td class="fw-bold text-success fs-4">
+                        Bs. {{ p.total_neto }}
+                    </td>
+                    <td>
+                        <span class="badge badge-{{ p.estado }} text-uppercase">
+                            {{ p.estado|replace('_', ' ') }}
+                        </span>
+                    </td>
+                    <td class="text-center">
+                        <a href="{{ url_for('nomina.detalle', periodo_id=p.periodo_id) }}" class="btn btn-sm btn-outline-primary">
+                            Inspeccionar
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">
+                        No se han generado periodos de nómina en el sistema.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

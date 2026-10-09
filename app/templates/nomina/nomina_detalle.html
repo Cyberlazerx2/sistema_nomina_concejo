@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block title %}Detalle del Periodo #{{ periodo.periodo_id }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none mb-3">
+    <div class="row align-items-center">
+        <div class="col">
+            <h2 class="page-title">
+                Periodo #{{ periodo.periodo_id }}: {{ periodo.descripcion }}
+            </h2>
+            <div class="text-muted mt-1">
+                Tipo: <strong>{{ periodo.tipo_nomina|replace('_', ' ')|upper }}</strong> | 
+                Lapso: <strong>{{ periodo.fecha_inicio }}</strong> al <strong>{{ periodo.fecha_fin }}</strong> | 
+                Periodicidad: <strong>{{ periodo.periodicidad|capitalize }}</strong>
+            </div>
+        </div>
+        <div class="col-auto ms-auto d-print-none d-flex gap-2">
+            <a href="{{ url_for('nomina.historial') }}" class="btn btn-outline-secondary">
+                ← Volver al Historial
+            </a>
+            <a href="{{ url_for('nomina.reporte_consolidado', periodo_id=periodo.periodo_id) }}" target="_blank" class="btn btn-dark">
+                📊 Sábana Consolidada (Imprimir / ODS)
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Tarjeta de Resumen y Estado -->
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="row align-items-center mb-3">
+            <div class="col">
+                <span class="fs-4 fw-bold">Totales del Periodo:</span>
+                <span class="ms-3 text-muted">Asignaciones: <strong class="text-dark">Bs. {{ periodo.total_asignaciones }}</strong></span>
+                <span class="ms-3 text-muted">Deducciones: <strong class="text-danger">Bs. {{ periodo.total_deducciones }}</strong></span>
+                <span class="ms-3 text-muted">Total Neto a Pagar: <strong class="text-success fs-3">Bs. {{ periodo.total_neto }}</strong></span>
+            </div>
+            <div class="col-auto">
+                <span class="badge badge-{{ periodo.estado }} fs-5 px-3 py-2 text-uppercase">
+                    {{ periodo.estado|replace('_', ' ') }}
+                </span>
+            </div>
+        </div>
+
+        <div class="p-2 bg-light rounded border text-muted small">
+            Elaborada por: <strong class="text-dark">{{ periodo.analista_nom or 'Pendiente' }}</strong> &nbsp;|&nbsp; 
+            Revisada por: <strong class="text-dark">{{ periodo.directora_nom or 'Pendiente' }}</strong> &nbsp;|&nbsp; 
+            Aprobada por: <strong class="text-dark">{{ periodo.presidente_nom or 'Pendiente' }}</strong>
+        </div>
+
+        <!-- Alerta de Devolución / Rechazo -->
+        {% if periodo.observaciones_rechazo or periodo.estado == 'rechazada' %}
+        <div class="alert alert-danger mt-3 mb-0" role="alert">
+            <h4 class="alert-title">⚠️ Periodo Devuelto con Observaciones:</h4>
+            <div class="text-muted bg-white p-2 rounded border border-danger-subtle fw-bold mt-1">
+                {{ periodo.observaciones_rechazo if periodo.observaciones_rechazo else 'No se detalló motivo específico.' }}
+            </div>
+            <small class="d-block mt-1 text-danger">
+                * El Analista o la Dirección deben subsanar las incidencias antes de solicitar una nueva validación.
+            </small>
+        </div>
+        {% endif %}
+
+        <!-- Acción Operativa: Recalcular (Analista y Directora) -->
+        {% if session.get('rol') in ['analista_rrhh', 'directora_rrhh'] and periodo.estado in ['borrador', 'rechazada'] %}
+        <div class="alert alert-warning mt-3 mb-0 d-flex justify-content-between align-items-center">
+            <div>
+                <strong>Acción Operativa:</strong> ¿Se actualizaron datos de asistencia, primas o salarios? Puede recalcular el periodo.
+            </div>
+            <form method="POST" action="{{ url_for('nomina.recalcular', periodo_id=periodo.periodo_id) }}">
+                <button type="submit" class="btn btn-warning text-dark fw-bold" onclick="return confirm('¿Desea volver a ejecutar los cálculos matemáticos para este periodo?');">
+                    🔄 Recalcular y Subsanar Nómina
+                </button>
+            </form>
+        </div>
+        {% endif %}
+
+        <!-- Acción: Revisión Técnica (Directora de RRHH) -->
+        {% if session.get('rol') == 'directora_rrhh' and periodo.estado == 'borrador' %}
+        <div class="card card-body bg-light mt-3 border-primary">
+            <form method="POST" action="{{ url_for('nomina.revisar', periodo_id=periodo.periodo_id) }}">
+                <h4 class="text-primary mb-2">Revisión Técnica (Directora de RRHH)</h4>
+                <div class="mb-2">
+                    <textarea name="observaciones_rechazo" rows="2" class="form-control" placeholder="Si va a rechazar la nómina, redacte aquí el motivo del error técnico detectado..."></textarea>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" name="accion" value="validar" class="btn btn-success fw-bold">✓ Validar Nómina (Conforme)</button>
+                    <button type="submit" name="accion" value="rechazar" class="btn btn-danger fw-bold" onclick="return confirm('¿Seguro que desea rechazar y devolver este periodo?');">✕ Rechazar Nómina</button>
+                </div>
+            </form>
+        </div>
+        {% endif %}
+
+        <!-- Acción: Aprobación Institucional (Presidente del Concejo) -->
+        {% if session.get('rol') == 'presidente' and periodo.estado == 'revisada' %}
+        <div class="card card-body bg-light mt-3 border-success">
+            <form method="POST" action="{{ url_for('nomina.aprobar', periodo_id=periodo.periodo_id) }}">
+                <h4 class="text-success mb-2">Aprobación Institucional (Presidente del Concejo)</h4>
+                <div class="mb-2">
+                    <textarea name="observaciones_rechazo" rows="2" class="form-control" placeholder="Si devuelve la nómina, indique las observaciones institucionales o presupuestarias..."></textarea>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" name="accion" value="aprobar" class="btn btn-success fw-bold">🔒 Aprobar y Bloquear Periodo</button>
+                    <button type="submit" name="accion" value="devolver" class="btn btn-danger fw-bold" onclick="return confirm('¿Seguro que desea devolver este periodo a RRHH?');">✕ Devolver a RRHH</button>
+                </div>
+            </form>
+        </div>
+        {% endif %}
+
+        <!-- Acción: Dispersión Patria (Directora de RRHH) -->
+        {% if session.get('rol') == 'directora_rrhh' and periodo.estado in ['aprobada', 'procesada_patria'] %}
+        <div class="alert alert-info mt-3 mb-0 d-flex justify-content-between align-items-center">
+            <div>
+                <strong>Dispersión Bancaria:</strong> Periodo aprobado institucionalmente y listo para su exportación al Sistema Patria.
+            </div>
+            <a href="{{ url_for('nomina.exportar_patria', periodo_id=periodo.periodo_id) }}" class="btn btn-indigo fw-bold">
+                📥 Descargar Archivo TXT Sistema Patria
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Plantilla de Trabajadores y Conceptos -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Plantilla y Recibos de Pago del Periodo</h3>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-striped">
+            <thead>
+                <tr>
+                    <th>Cédula</th>
+                    <th>Funcionario</th>
+                    <th>Cargo</th>
+                    <th>Banco / Cuenta (20 Dígitos)</th>
+                    <th>Neto a Cobrar</th>
+                    <th>Conceptos Aplicados (LOTTT 106)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for trab in trabajadores %}
+                <tr>
+                    <td class="fw-bold">{{ trab.cedula }}</td>
+                    <td>{{ trab.nombres }} {{ trab.apellidos }}</td>
+                    <td class="text-muted">{{ trab.cargo_nombre }}</td>
+                    <td class="font-monospace small">
+                        <div>{{ trab.banco }}</div>
+                        <div class="text-muted">{{ trab.numero_cuenta }}</div>
+                    </td>
+                    <td class="text-success fw-bold fs-4">
+                        Bs. {{ trab.neto_pagar }}
+                    </td>
+                    <td>
+                        <ul class="list-unstyled mb-0 small">
+                            {% for d in trab.desglose %}
+                                <li class="{{ 'text-danger' if d.tipo == 'deduccion' else 'text-dark' }}">
+                                    {{ d.descripcion }}: <strong>Bs. {{ d.monto }}</strong>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">
+                        No hay trabajadores registrados en este periodo de nómina.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

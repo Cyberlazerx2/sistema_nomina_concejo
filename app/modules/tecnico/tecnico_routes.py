@@ -51,7 +51,7 @@ def usuarios():
             trabajadores_pendientes = cursor.fetchall()
 
             return render_template(
-                'tecnico_usuarios.html',
+                'tecnico/tecnico_usuarios.html',
                 usuarios=lista_usuarios,
                 pendientes=trabajadores_pendientes
             )
@@ -143,7 +143,7 @@ def nuevo_usuario():
             roles = cursor.fetchall()
 
             return render_template(
-                'tecnico_usuario_form.html',
+                'tecnico/tecnico_usuario_form.html',
                 trabajadores=trabajadores_disponibles,
                 roles=roles,
                 trabajador_id_param=trabajador_id_param
@@ -300,7 +300,7 @@ def bitacora():
             tablas_disponibles = [row['tabla'] for row in cursor.fetchall()]
 
             return render_template(
-                'tecnico_bitacora.html',
+                'tecnico/tecnico_bitacora.html',
                 eventos=eventos,
                 tablas=tablas_disponibles,
                 tabla_filtro=tabla_filtro,

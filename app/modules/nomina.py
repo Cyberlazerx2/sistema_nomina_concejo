@@ -57,7 +57,7 @@ def generar():
 
                 if not plantilla:
                     flash(f'No hay trabajadores activos registrados en la nómina: {tipo_personal}', 'warning')
-                    return render_template('nomina_generar.html', tipos_nomina=tipos_nomina)
+                    return render_template('nomina/nomina_generar.html', tipos_nomina=tipos_nomina)
 
                 cursor.execute("SELECT * FROM concepto WHERE activo = true;")
                 conceptos = cursor.fetchall()
@@ -137,7 +137,7 @@ def generar():
                     return redirect(url_for('nomina.historial'))
 
                 return render_template(
-                    'nomina_generar.html', 
+                    'nomina/nomina_generar.html', 
                     tipos_nomina=tipos_nomina,
                     resultados=resultados,
                     parametros={
@@ -157,7 +157,7 @@ def generar():
     finally:
         conexion.close()
 
-    return render_template('nomina_generar.html', tipos_nomina=tipos_nomina)
+    return render_template('nomina/nomina_generar.html', tipos_nomina=tipos_nomina)
 
 @nomina_bp.route('/historial')
 def historial():
@@ -180,7 +180,7 @@ def historial():
             """
             cursor.execute(sql)
             periodos = cursor.fetchall()
-            return render_template('nomina_historial.html', periodos=periodos)
+            return render_template('nomina/nomina_historial.html', periodos=periodos)
     finally:
         conexion.close()
 
@@ -234,7 +234,7 @@ def detalle(periodo_id):
                 cursor.execute(sql_det, (trab['nomina_trabajador_id'],))
                 trab['desglose'] = cursor.fetchall()
 
-            return render_template('nomina_detalle.html', periodo=periodo, trabajadores=trabajadores)
+            return render_template('nomina/nomina_detalle.html', periodo=periodo, trabajadores=trabajadores)
     finally:
         conexion.close()
 
@@ -673,7 +673,7 @@ def reporte_consolidado(periodo_id):
             titulo_nomina = mapa_nombres.get(periodo['tipo_nomina'], periodo['tipo_nomina'].upper())
 
             return render_template(
-                'nomina_consolidada.html',
+                'nomina/nomina_consolidada.html',
                 periodo=periodo,
                 titulo_nomina=titulo_nomina,
                 filas=filas,

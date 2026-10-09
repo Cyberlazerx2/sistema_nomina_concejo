@@ -57,7 +57,7 @@ def listar():
             registros = cursor.fetchall()
 
             return render_template(
-                'asistencia_lista.html',
+                'asistencia/asistencia_lista.html',
                 registros=registros,
                 fecha_filtro=fecha_filtro,
                 tipo_filtro=tipo_filtro,
@@ -89,7 +89,7 @@ def nueva():
                     flash('Los campos de trabajador, fecha y estado son obligatorios.', 'warning')
                     cursor.execute("SELECT trabajador_id, cedula, nombres, apellidos FROM trabajador WHERE activo = true ORDER BY apellidos ASC;")
                     trabajadores = cursor.fetchall()
-                    return render_template('asistencia_form.html', trabajadores=trabajadores, estados=ESTADOS_ASISTENCIA)
+                    return render_template('asistencia/asistencia_form.html', trabajadores=trabajadores, estados=ESTADOS_ASISTENCIA)
 
                 # Comprobar si ya existe registro en la misma fecha
                 cursor.execute("""
@@ -152,7 +152,7 @@ def nueva():
             """)
             trabajadores = cursor.fetchall()
             hoy = datetime.date.today().strftime('%Y-%m-%d')
-            return render_template('asistencia_form.html', trabajadores=trabajadores, estados=ESTADOS_ASISTENCIA, hoy=hoy)
+            return render_template('asistencia/asistencia_form.html', trabajadores=trabajadores, estados=ESTADOS_ASISTENCIA, hoy=hoy)
     except Exception as e:
         conexion.rollback()
         flash(f'Error al registrar asistencia: {e}', 'danger')

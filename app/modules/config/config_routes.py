@@ -27,7 +27,7 @@ def conceptos():
             """
             cursor.execute(sql)
             conceptos_lista = cursor.fetchall()
-            return render_template('config_conceptos.html', conceptos=conceptos_lista)
+            return render_template('config/config_conceptos.html', conceptos=conceptos_lista)
     finally:
         conexion.close()
 

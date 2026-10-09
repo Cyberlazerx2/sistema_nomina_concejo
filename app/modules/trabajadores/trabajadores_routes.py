@@ -41,7 +41,7 @@ def listar():
             """
             cursor.execute(sql)
             trabajadores = cursor.fetchall()
-            return render_template('trabajadores_lista.html', trabajadores=trabajadores)
+            return render_template('trabajadores/trabajadores_lista.html', trabajadores=trabajadores)
     finally:
         conexion.close()
 
@@ -83,7 +83,7 @@ def nuevo():
                     flash(f'La cédula {cedula} ya se encuentra registrada en el sistema.', 'warning')
                     cursor.execute("SELECT cargo_id, nombre, sueldo_base FROM cargo WHERE activo = true;")
                     cargos = cursor.fetchall()
-                    return render_template('trabajadores_form.html', modo='crear', cargos=cargos,
+                    return render_template('trabajadores/trabajadores_form.html', modo='crear', cargos=cargos,
                                            tipos_personal=TIPOS_PERSONAL, niveles=NIVELES_INSTRUCCION)
 
                 sql_insert = """
@@ -122,7 +122,7 @@ def nuevo():
             # Si es GET: consultar cargos activos para el selector
             cursor.execute("SELECT cargo_id, nombre, sueldo_base FROM cargo WHERE activo = true ORDER BY nombre;")
             cargos = cursor.fetchall()
-            return render_template('trabajadores_form.html', modo='crear', cargos=cargos,
+            return render_template('trabajadores/trabajadores_form.html', modo='crear', cargos=cargos,
                                    tipos_personal=TIPOS_PERSONAL, niveles=NIVELES_INSTRUCCION)
     except Exception as e:
         conexion.rollback()
@@ -211,7 +211,7 @@ def editar(id):
             # Si es GET: consultar cargos y cargar formulario con datos previos
             cursor.execute("SELECT cargo_id, nombre, sueldo_base FROM cargo WHERE activo = true ORDER BY nombre;")
             cargos = cursor.fetchall()
-            return render_template('trabajadores_form.html', modo='editar', trabajador=valor_previo,
+            return render_template('trabajadores/trabajadores_form.html', modo='editar', trabajador=valor_previo,
                                    cargos=cargos, tipos_personal=TIPOS_PERSONAL, niveles=NIVELES_INSTRUCCION)
     except Exception as e:
         conexion.rollback()
@@ -310,7 +310,7 @@ def crear_usuario(id):
                     flash('Todos los campos del formulario de usuario son obligatorios.', 'warning')
                     cursor.execute("SELECT rol_id, nombre, descripcion FROM rol ORDER BY rol_id;")
                     roles = cursor.fetchall()
-                    return render_template('trabajadores_usuario.html', trabajador=trabajador, roles=roles)
+                    return render_template('trabajadores/trabajadores_usuario.html', trabajador=trabajador, roles=roles)
 
                 # Comprobar disponibilidad de nombre_usuario
                 cursor.execute("SELECT usuario_id FROM usuario WHERE nombre_usuario = %s;", (nombre_usuario,))
@@ -318,7 +318,7 @@ def crear_usuario(id):
                     flash(f"El nombre de usuario '{nombre_usuario}' ya está en uso.", 'danger')
                     cursor.execute("SELECT rol_id, nombre, descripcion FROM rol ORDER BY rol_id;")
                     roles = cursor.fetchall()
-                    return render_template('trabajadores_usuario.html', trabajador=trabajador, roles=roles)
+                    return render_template('trabajadores/trabajadores_usuario.html', trabajador=trabajador, roles=roles)
 
                 # Generar hash seguro e insertar
                 clave_hash = generate_password_hash(clave_temporal)
@@ -358,7 +358,7 @@ def crear_usuario(id):
             # Si es GET: listar roles disponibles para el select
             cursor.execute("SELECT rol_id, nombre, descripcion FROM rol ORDER BY rol_id;")
             roles = cursor.fetchall()
-            return render_template('trabajadores_usuario.html', trabajador=trabajador, roles=roles)
+            return render_template('trabajadores/trabajadores_usuario.html', trabajador=trabajador, roles=roles)
     except Exception as e:
         conexion.rollback()
         flash(f'Error al crear cuenta de usuario: {e}', 'danger')
@@ -391,7 +391,7 @@ def solicitudes():
             """
             cursor.execute(sql)
             solicitudes_lista = cursor.fetchall()
-            return render_template('trabajadores_solicitudes.html', solicitudes=solicitudes_lista)
+            return render_template('trabajadores/trabajadores_solicitudes.html', solicitudes=solicitudes_lista)
     finally:
         conexion.close()
 

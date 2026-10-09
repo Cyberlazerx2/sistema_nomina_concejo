@@ -89,7 +89,7 @@ def index():
             """, (session['usuario_id'],))
             historial = cursor.fetchall()
 
-            return render_template('chatbot.html', trabajador=trabajador, historial=historial)
+            return render_template('chatbot/chatbot.html', trabajador=trabajador, historial=historial)
     finally:
         conexion.close()
 
