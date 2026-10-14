@@ -9,15 +9,14 @@ organizacion_bp = Blueprint('organizacion', __name__)
 ROLES_PERMITIDOS = ['directora_rrhh', 'tecnico_informatica']
 
 def verificar_acceso():
-    """Valida la sesion activa y la pertenencia a los roles autorizados."""
     if 'usuario_id' not in session or session.get('rol') not in ROLES_PERMITIDOS:
         return False
     return True
 
 # -------------------------------------------------------------------------
-# 1. LISTAR DEPARTAMENTOS
+# 1. LISTAR Y CREAR DEPARTAMENTOS EN LA MISMA VISTA (MODAL POST)
 # -------------------------------------------------------------------------
-@organizacion_bp.route('/departamentos')
+@organizacion_bp.route('/departamentos', methods=['GET', 'POST'])
 def departamentos():
     if not verificar_acceso():
         flash('Acceso denegado: Se requieren permisos directivos o de soporte técnico.', 'danger')
@@ -26,51 +25,22 @@ def departamentos():
     conexion = get_db_connection()
     try:
         with conexion.cursor() as cursor:
-            sql = """
-                SELECT d.departamento_id, d.nombre, d.activo,
-                       COUNT(c.cargo_id) AS total_cargos
-                FROM departamento d
-                LEFT JOIN cargo c ON d.departamento_id = c.departamento_id
-                GROUP BY d.departamento_id, d.nombre, d.activo
-                ORDER BY d.nombre ASC;
-            """
-            cursor.execute(sql)
-            lista_deptos = cursor.fetchall()
-            return render_template('organizacion/organizacion_departamentos.html', departamentos=lista_deptos)
-    finally:
-        conexion.close()
+            if request.method == 'POST':
+                nombre = request.form.get('nombre', '').strip()
 
-# -------------------------------------------------------------------------
-# 2. CREAR DEPARTAMENTO
-# -------------------------------------------------------------------------
-@organizacion_bp.route('/departamentos/nuevo', methods=['GET', 'POST'])
-def nuevo_departamento():
-    if not verificar_acceso():
-        flash('Acceso denegado: No tiene autorización para crear dependencias.', 'danger')
-        return redirect(url_for('organizacion.departamentos'))
+                if not nombre:
+                    flash('El nombre del departamento es obligatorio.', 'warning')
+                    return redirect(url_for('organizacion.departamentos'))
 
-    if request.method == 'POST':
-        nombre = request.form.get('nombre', '').strip()
-
-        if not nombre:
-            flash('El nombre del departamento es obligatorio.', 'warning')
-            return render_template('organizacion/organizacion_departamento_form.html')
-
-        conexion = get_db_connection()
-        try:
-            with conexion.cursor() as cursor:
-                # Validar unicidad del departamento
                 cursor.execute("SELECT departamento_id FROM departamento WHERE nombre = %s;", (nombre,))
                 if cursor.fetchone():
                     flash(f"El departamento '{nombre}' ya se encuentra registrado.", 'warning')
-                    return render_template('organizacion/organizacion_departamento_form.html')
+                    return redirect(url_for('organizacion.departamentos'))
 
-                # Insercion del departamento
                 sql_insert = "INSERT INTO departamento (nombre, activo) VALUES (%s, true);"
                 cursor.execute(sql_insert, (nombre,))
                 nuevo_id = cursor.lastrowid
 
-                # Auditoria en bitacora
                 sql_bitacora = """
                     INSERT INTO bitacora (usuario_id, tabla, registro_id, accion, valor_previo, valor_nuevo, fecha_hora, ip)
                     VALUES (%s, 'departamento', %s, 'insertar', NULL, %s, %s, %s);
@@ -87,17 +57,29 @@ def nuevo_departamento():
                 conexion.commit()
                 flash(f"Departamento '{nombre}' creado con éxito.", 'success')
                 return redirect(url_for('organizacion.departamentos'))
-        except Exception as e:
-            conexion.rollback()
-            flash(f'Error al registrar departamento: {e}', 'danger')
-            return redirect(url_for('organizacion.departamentos'))
-        finally:
-            conexion.close()
 
-    return render_template('organizacion/organizacion_departamento_form.html')
+            sql = """
+                SELECT d.departamento_id, d.nombre, d.activo,
+                       COUNT(DISTINCT c.cargo_id) AS total_cargos,
+                       COUNT(DISTINCT t.trabajador_id) AS total_trabajadores
+                FROM departamento d
+                LEFT JOIN cargo c ON d.departamento_id = c.departamento_id
+                LEFT JOIN trabajador t ON c.cargo_id = t.cargo_id AND t.activo = true
+                GROUP BY d.departamento_id, d.nombre, d.activo
+                ORDER BY d.nombre ASC;
+            """
+            cursor.execute(sql)
+            lista_deptos = cursor.fetchall()
+            return render_template('organizacion/organizacion_departamentos.html', departamentos=lista_deptos)
+    except Exception as e:
+        conexion.rollback()
+        flash(f'Error en gestión de departamentos: {e}', 'danger')
+        return redirect(url_for('organizacion.departamentos'))
+    finally:
+        conexion.close()
 
 # -------------------------------------------------------------------------
-# 3. LISTAR CARGOS CON SU DEPARTAMENTO
+# 2. LISTAR CARGOS CON SU DEPARTAMENTO (ALIMENTA EL MODAL DE NUEVO CARGO)
 # -------------------------------------------------------------------------
 @organizacion_bp.route('/cargos')
 def cargos():
@@ -117,12 +99,17 @@ def cargos():
             """
             cursor.execute(sql)
             lista_cargos = cursor.fetchall()
-            return render_template('organizacion/organizacion_cargos.html', cargos=lista_cargos)
+
+            # Departamentos activos para el modal de nuevo cargo
+            cursor.execute("SELECT departamento_id, nombre FROM departamento WHERE activo = true ORDER BY nombre ASC;")
+            departamentos_activos = cursor.fetchall()
+
+            return render_template('organizacion/organizacion_cargos.html', cargos=lista_cargos, departamentos=departamentos_activos)
     finally:
         conexion.close()
 
 # -------------------------------------------------------------------------
-# 4. CREAR CARGO
+# 3. CREAR CARGO (PROCESA EL MODAL O FORMULARIO)
 # -------------------------------------------------------------------------
 @organizacion_bp.route('/cargos/nuevo', methods=['GET', 'POST'])
 def nuevo_cargo():
@@ -140,17 +127,13 @@ def nuevo_cargo():
 
                 if not nombre or not departamento_id or not sueldo_base_raw:
                     flash('Todos los campos del cargo son obligatorios.', 'warning')
-                    cursor.execute("SELECT departamento_id, nombre FROM departamento WHERE activo = true ORDER BY nombre ASC;")
-                    departamentos_activos = cursor.fetchall()
-                    return render_template('organizacion/organizacion_cargo_form.html', modo='crear', departamentos=departamentos_activos)
+                    return redirect(url_for('organizacion.cargos'))
 
                 try:
                     sueldo_base = Decimal(sueldo_base_raw)
                 except Exception:
                     flash('El sueldo base de referencia debe ser un valor numérico válido.', 'danger')
-                    cursor.execute("SELECT departamento_id, nombre FROM departamento WHERE activo = true ORDER BY nombre ASC;")
-                    departamentos_activos = cursor.fetchall()
-                    return render_template('organizacion/organizacion_cargo_form.html', modo='crear', departamentos=departamentos_activos)
+                    return redirect(url_for('organizacion.cargos'))
 
                 sql_insert = """
                     INSERT INTO cargo (departamento_id, nombre, sueldo_base, activo)
@@ -159,7 +142,6 @@ def nuevo_cargo():
                 cursor.execute(sql_insert, (departamento_id, nombre, sueldo_base))
                 nuevo_id = cursor.lastrowid
 
-                # Auditoria en bitacora
                 sql_bitacora = """
                     INSERT INTO bitacora (usuario_id, tabla, registro_id, accion, valor_previo, valor_nuevo, fecha_hora, ip)
                     VALUES (%s, 'cargo', %s, 'insertar', NULL, %s, %s, %s);
@@ -180,7 +162,7 @@ def nuevo_cargo():
                 ))
 
                 conexion.commit()
-                flash(f"Cargo '{nombre}' creado con éxito.", 'success')
+                flash(f"Cargo '{nombre}' creado con éxito en el RAC.", 'success')
                 return redirect(url_for('organizacion.cargos'))
 
             cursor.execute("SELECT departamento_id, nombre FROM departamento WHERE activo = true ORDER BY nombre ASC;")
@@ -194,7 +176,7 @@ def nuevo_cargo():
         conexion.close()
 
 # -------------------------------------------------------------------------
-# 5. EDITAR CARGO EXISTENTE
+# 4. EDITAR CARGO EXISTENTE
 # -------------------------------------------------------------------------
 @organizacion_bp.route('/cargos/<int:id>/editar', methods=['GET', 'POST'])
 def editar_cargo(id):
@@ -238,11 +220,9 @@ def editar_cargo(id):
                 """
                 cursor.execute(sql_update, (departamento_id, nombre, sueldo_base, id))
 
-                # Obtener estado posterior exacto
                 cursor.execute("SELECT * FROM cargo WHERE cargo_id = %s;", (id,))
                 valor_nuevo = cursor.fetchone()
 
-                # Auditoria en bitacora
                 sql_bitacora = """
                     INSERT INTO bitacora (usuario_id, tabla, registro_id, accion, valor_previo, valor_nuevo, fecha_hora, ip)
                     VALUES (%s, 'cargo', %s, 'modificar', %s, %s, %s, %s);
@@ -271,7 +251,7 @@ def editar_cargo(id):
         conexion.close()
 
 # -------------------------------------------------------------------------
-# 6. DESACTIVAR CARGO (Baja logica inalterable)
+# 5. DESACTIVAR CARGO
 # -------------------------------------------------------------------------
 @organizacion_bp.route('/cargos/<int:id>/desactivar', methods=['POST'])
 def desactivar_cargo(id):
@@ -289,13 +269,11 @@ def desactivar_cargo(id):
                 flash('El cargo no existe o ya se encuentra inactivo.', 'warning')
                 return redirect(url_for('organizacion.cargos'))
 
-            # Desactivacion logica obligatoria (preserva relaciones historicas de nomina y trabajadores)
             cursor.execute("UPDATE cargo SET activo = false WHERE cargo_id = %s;", (id,))
 
             valor_nuevo = dict(valor_previo)
             valor_nuevo['activo'] = False
 
-            # Auditoria en bitacora
             sql_bitacora = """
                 INSERT INTO bitacora (usuario_id, tabla, registro_id, accion, valor_previo, valor_nuevo, fecha_hora, ip)
                 VALUES (%s, 'cargo', %s, 'eliminar', %s, %s, %s, %s);

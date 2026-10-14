@@ -1,212 +1,209 @@
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 import datetime
-import json
+from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify
 from app.database import get_db_connection
 
 asistencia_bp = Blueprint('asistencia', __name__)
 
-ROLES_PERMITIDOS = ['analista_rrhh', 'directora_rrhh']
-
-ESTADOS_ASISTENCIA = [
-    ('presente', 'Presente'),
-    ('falta_justificada', 'Falta Justificada'),
-    ('falta_injustificada', 'Falta Injustificada'),
-    ('reposo', 'Reposo Médico'),
-    ('vacaciones', 'Vacaciones'),
-    ('permiso', 'Permiso Remunerado / No Remunerado')
-]
-
-def verificar_acceso():
-    if 'usuario_id' not in session or session.get('rol') not in ROLES_PERMITIDOS:
-        return False
-    return True
-
-# -------------------------------------------------------------------------
-# 1. LISTADO GENERAL DE ASISTENCIAS / NOVEDADES
-# Permite filtrar por fecha y tipo de personal
-# -------------------------------------------------------------------------
 @asistencia_bp.route('/')
+@asistencia_bp.route('/listar')
 def listar():
-    if not verificar_acceso():
-        flash('Acceso denegado: Solo el personal de Recursos Humanos puede acceder a este módulo.', 'danger')
+    if 'usuario_id' not in session or session.get('rol') not in ['analista_rrhh', 'directora_rrhh']:
+        flash('Acceso denegado: Módulo restringido a Recursos Humanos.', 'danger')
         return redirect(url_for('auth.dashboard'))
 
-    fecha_filtro = request.args.get('fecha', datetime.date.today().strftime('%Y-%m-%d'))
-    tipo_filtro = request.args.get('tipo_personal', '')
+    # Fecha seleccionada (por defecto hoy)
+    fecha_str = request.args.get('fecha')
+    hoy = datetime.date.today()
+    try:
+        fecha_activa = datetime.datetime.strptime(fecha_str, '%Y-%m-%d').date() if fecha_str else hoy
+    except ValueError:
+        fecha_activa = hoy
+
+    fecha_anterior = (fecha_activa - datetime.timedelta(days=1)).strftime('%Y-%m-%d')
+    fecha_siguiente = (fecha_activa + datetime.timedelta(days=1)).strftime('%Y-%m-%d')
+    es_futuro = fecha_activa > hoy
 
     conexion = get_db_connection()
     try:
         with conexion.cursor() as cursor:
+            # 1. Obtener departamentos para el filtro de categorias
+            cursor.execute("SELECT departamento_id, nombre FROM departamento ORDER BY nombre ASC;")
+            departamentos = cursor.fetchall()
+
+            # 2. Consultar todos los trabajadores activos y cruzar con la asistencia del día
             sql = """
-                SELECT a.asistencia_id, a.fecha, a.estado, a.observacion,
-                       t.trabajador_id, t.cedula, t.nombres, t.apellidos, t.tipo_personal,
-                       c.nombre AS cargo_nombre
-                FROM asistencia a
-                INNER JOIN trabajador t ON a.trabajador_id = t.trabajador_id
-                INNER JOIN cargo c ON t.cargo_id = c.cargo_id
-                WHERE a.fecha = %s
+                SELECT t.trabajador_id, t.cedula, t.nombres, t.apellidos,
+                       c.nombre AS cargo_nombre, d.nombre AS departamento_nombre,
+                       a.asistencia_id, a.estado, a.justificacion
+                FROM trabajador t
+                LEFT JOIN cargo c ON t.cargo_id = c.cargo_id
+                LEFT JOIN departamento d ON c.departamento_id = d.departamento_id
+                LEFT JOIN asistencia a ON t.trabajador_id = a.trabajador_id AND a.fecha = %s
+                WHERE t.activo = true
+                ORDER BY d.nombre ASC, t.apellidos ASC;
             """
-            params = [fecha_filtro]
+            cursor.execute(sql, (fecha_activa,))
+            filas = cursor.fetchall()
 
-            if tipo_filtro:
-                sql += " AND t.tipo_personal = %s"
-                params.append(tipo_filtro)
+            # 3. Procesar datos y conteos de estado
+            conteos = {
+                'todos': len(filas),
+                'presente': 0,
+                'reposo': 0,
+                'falta': 0,
+                'vacaciones': 0,
+                'sin_marcar': 0
+            }
 
-            sql += " ORDER BY t.apellidos ASC, t.nombres ASC;"
-            cursor.execute(sql, tuple(params))
-            registros = cursor.fetchall()
+            for f in filas:
+                estado = f['estado'] or 'sin_marcar'
+                f['estado_normalizado'] = estado
+                if estado in conteos:
+                    conteos[estado] += 1
+                else:
+                    conteos['sin_marcar'] += 1
+
+                # Iniciales para avatar
+                nom = f['nombres'].split()[0] if f['nombres'] else ''
+                ape = f['apellidos'].split()[0] if f['apellidos'] else ''
+                f['iniciales'] = (nom[:1] + ape[:1]).upper() or 'TR'
 
             return render_template(
                 'asistencia/asistencia_lista.html',
-                registros=registros,
-                fecha_filtro=fecha_filtro,
-                tipo_filtro=tipo_filtro,
-                estados=ESTADOS_ASISTENCIA
+                fecha_activa=fecha_activa.strftime('%Y-%m-%d'),
+                fecha_formateada=fecha_activa.strftime('%d/%m/%Y'),
+                fecha_anterior=fecha_anterior,
+                fecha_siguiente=fecha_siguiente,
+                es_futuro=es_futuro,
+                es_hoy=(fecha_activa == hoy),
+                departamentos=departamentos,
+                trabajadores=filas,
+                conteos=conteos
             )
     finally:
         conexion.close()
 
 # -------------------------------------------------------------------------
-# 2. REGISTRAR NOVEDAD O ASISTENCIA INDIVIDUAL
-# Si ya existe registro para esa fecha y trabajador, lo actualiza
+# Marcado Masivo de Asistencia (Bulk Presence)
 # -------------------------------------------------------------------------
-@asistencia_bp.route('/nueva', methods=['GET', 'POST'])
-def nueva():
-    if not verificar_acceso():
-        flash('Acceso denegado.', 'danger')
-        return redirect(url_for('auth.dashboard'))
+@asistencia_bp.route('/marcar-masivo', methods=['POST'])
+def marcar_masivo():
+    if 'usuario_id' not in session or session.get('rol') not in ['analista_rrhh', 'directora_rrhh']:
+        return jsonify({'error': 'No autorizado'}), 403
+
+    datos = request.get_json() or {}
+    fecha = datos.get('fecha')
+    trabajador_ids = datos.get('trabajador_ids', [])
+
+    if not fecha or not trabajador_ids:
+        return jsonify({'error': 'Datos incompletos para el registro'}), 400
 
     conexion = get_db_connection()
     try:
         with conexion.cursor() as cursor:
-            if request.method == 'POST':
-                trabajador_id = request.form.get('trabajador_id')
-                fecha = request.form.get('fecha')
-                estado = request.form.get('estado')
-                observacion = request.form.get('observacion', '').strip()[:150]
-
-                if not trabajador_id or not fecha or not estado:
-                    flash('Los campos de trabajador, fecha y estado son obligatorios.', 'warning')
-                    cursor.execute("SELECT trabajador_id, cedula, nombres, apellidos FROM trabajador WHERE activo = true ORDER BY apellidos ASC;")
-                    trabajadores = cursor.fetchall()
-                    return render_template('asistencia/asistencia_form.html', trabajadores=trabajadores, estados=ESTADOS_ASISTENCIA)
-
-                # Comprobar si ya existe registro en la misma fecha
-                cursor.execute("""
-                    SELECT * FROM asistencia 
-                    WHERE trabajador_id = %s AND fecha = %s;
-                """, (trabajador_id, fecha))
-                existente = cursor.fetchone()
-
-                ahora = datetime.datetime.now()
-
-                if existente:
-                    # Actualizar estado existente
-                    cursor.execute("""
-                        UPDATE asistencia 
-                        SET estado = %s, observacion = %s 
-                        WHERE asistencia_id = %s;
-                    """, (estado, observacion, existente['asistencia_id']))
-
-                    asistencia_id = existente['asistencia_id']
-                    accion = 'modificar'
-                    valor_previo = existente
-                    valor_nuevo = {'asistencia_id': asistencia_id, 'trabajador_id': trabajador_id, 'fecha': str(fecha), 'estado': estado, 'observacion': observacion}
-                else:
-                    # Insertar nuevo registro
-                    cursor.execute("""
-                        INSERT INTO asistencia (trabajador_id, fecha, estado, observacion)
-                        VALUES (%s, %s, %s, %s);
-                    """, (trabajador_id, fecha, estado, observacion))
-
-                    asistencia_id = cursor.lastrowid
-                    accion = 'insertar'
-                    valor_previo = None
-                    valor_nuevo = {'asistencia_id': asistencia_id, 'trabajador_id': trabajador_id, 'fecha': str(fecha), 'estado': estado, 'observacion': observacion}
-
-                # Registro en bitacora
-                sql_bitacora = """
-                    INSERT INTO bitacora (usuario_id, tabla, registro_id, accion, valor_previo, valor_nuevo, fecha_hora, ip)
-                    VALUES (%s, 'asistencia', %s, %s, %s, %s, %s, %s);
-                """
-                cursor.execute(sql_bitacora, (
-                    session['usuario_id'],
-                    asistencia_id,
-                    accion,
-                    json.dumps(valor_previo, default=str) if valor_previo else None,
-                    json.dumps(valor_nuevo, default=str),
-                    ahora,
-                    request.remote_addr
-                ))
-
-                conexion.commit()
-                flash('Novedad de asistencia registrada correctamente.', 'success')
-                return redirect(url_for('asistencia.listar', fecha=fecha))
-
-            # Si es GET
-            cursor.execute("""
-                SELECT trabajador_id, cedula, nombres, apellidos, tipo_personal 
-                FROM trabajador 
-                WHERE activo = true 
-                ORDER BY apellidos ASC, nombres ASC;
-            """)
-            trabajadores = cursor.fetchall()
-            hoy = datetime.date.today().strftime('%Y-%m-%d')
-            return render_template('asistencia/asistencia_form.html', trabajadores=trabajadores, estados=ESTADOS_ASISTENCIA, hoy=hoy)
-    except Exception as e:
-        conexion.rollback()
-        flash(f'Error al registrar asistencia: {e}', 'danger')
-        return redirect(url_for('asistencia.listar'))
-    finally:
-        conexion.close()
-
-# -------------------------------------------------------------------------
-# 3. CARGA RÁPIDA DIARIA POR TIPO DE NÓMINA
-# Permite marcar la presencia por defecto a todo un grupo de personal
-# -------------------------------------------------------------------------
-@asistencia_bp.route('/carga-diaria', methods=['POST'])
-def carga_diaria():
-    if not verificar_acceso():
-        flash('Acceso denegado.', 'danger')
-        return redirect(url_for('auth.dashboard'))
-
-    fecha = request.form.get('fecha_carga')
-    tipo_personal = request.form.get('tipo_personal_carga')
-
-    if not fecha or not tipo_personal:
-        flash('Debe seleccionar fecha y tipo de nómina.', 'warning')
-        return redirect(url_for('asistencia.listar'))
-
-    conexion = get_db_connection()
-    try:
-        with conexion.cursor() as cursor:
-            # Obtener trabajadores activos del grupo
-            cursor.execute("""
-                SELECT trabajador_id FROM trabajador 
-                WHERE tipo_personal = %s AND activo = true;
-            """, (tipo_personal,))
-            plantilla = cursor.fetchall()
-
-            insertados = 0
-            for t in plantilla:
-                # Verificar si ya tiene novedad cargada para no sobreescribir reposos o permisos
+            for trab_id in trabajador_ids:
+                # Comprobar si ya existe registro para actualizarlo o insertarlo
                 cursor.execute("""
                     SELECT asistencia_id FROM asistencia 
                     WHERE trabajador_id = %s AND fecha = %s;
-                """, (t['trabajador_id'], fecha))
-                if not cursor.fetchone():
+                """, (trab_id, fecha))
+                existe = cursor.fetchone()
+
+                if existe:
                     cursor.execute("""
-                        INSERT INTO asistencia (trabajador_id, fecha, estado, observacion)
-                        VALUES (%s, %s, 'presente', 'Asistencia ordinaria');
-                    """, (t['trabajador_id'], fecha))
-                    insertados += 1
+                        UPDATE asistencia 
+                        SET estado = 'presente', justificacion = 'Marcado masivo ordinario'
+                        WHERE asistencia_id = %s;
+                    """, (existe['asistencia_id'],))
+                else:
+                    cursor.execute("""
+                        INSERT INTO asistencia (trabajador_id, fecha, estado, justificacion)
+                        VALUES (%s, %s, 'presente', 'Marcado masivo ordinario');
+                    """, (trab_id, fecha))
 
             conexion.commit()
-            flash(f'Se generaron {insertados} registros ordinarios para la fecha {fecha}.', 'success')
-            return redirect(url_for('asistencia.listar', fecha=fecha, tipo_personal=tipo_personal))
+            return jsonify({'success': True, 'total': len(trabajador_ids)})
     except Exception as e:
         conexion.rollback()
-        flash(f'Error en carga diaria: {e}', 'danger')
-        return redirect(url_for('asistencia.listar'))
+        return jsonify({'error': str(e)}), 500
     finally:
         conexion.close()
+
+# -------------------------------------------------------------------------
+# Registro de Novedades (Reposos Médicos / Faltas Injustificadas)
+# -------------------------------------------------------------------------
+@asistencia_bp.route('/registrar-novedad', methods=['POST'])
+def registrar_novedad():
+    if 'usuario_id' not in session or session.get('rol') not in ['analista_rrhh', 'directora_rrhh']:
+        flash('Acceso denegado.', 'danger')
+        return redirect(url_for('asistencia.listar'))
+
+    trabajador_id = request.form.get('trabajador_id')
+    tipo = request.form.get('tipo')  # 'reposo' o 'falta'
+    fecha_desde = request.form.get('desde')
+    fecha_hasta = request.form.get('hasta') or fecha_desde
+    certificado = request.form.get('certificado', '').strip()
+    observaciones = request.form.get('observaciones', '').strip()
+
+    if not trabajador_id or not fecha_desde:
+        flash('Debe seleccionar el trabajador y la fecha correspondiente.', 'danger')
+        return redirect(url_for('asistencia.listar'))
+
+    # Formatear la justificación
+    if tipo == 'reposo':
+        estado_bd = 'reposo'
+        detalles = []
+        if certificado:
+            detalles.append(f"Certificado IVSS/Médico: {certificado}")
+        if observaciones:
+            detalles.append(observaciones)
+        justificacion = " · ".join(detalles) if detalles else "Reposo Médico Avalado"
+    else:
+        estado_bd = 'falta'
+        justificacion = observaciones or "Inasistencia injustificada sin soporte"
+
+    # Generar rango de días
+    try:
+        f_inicio = datetime.datetime.strptime(fecha_desde, '%Y-%m-%d').date()
+        f_fin = datetime.datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
+    except ValueError:
+        flash('Formato de fecha inválido.', 'danger')
+        return redirect(url_for('asistencia.listar'))
+
+    conexion = get_db_connection()
+    try:
+        with conexion.cursor() as cursor:
+            actual = f_inicio
+            dias_registrados = 0
+            while actual <= f_fin:
+                # Omitir fines de semana (sábado=5, domingo=6)
+                if actual.weekday() < 5:
+                    cursor.execute("""
+                        SELECT asistencia_id FROM asistencia 
+                        WHERE trabajador_id = %s AND fecha = %s;
+                    """, (trabajador_id, actual))
+                    reg = cursor.fetchone()
+
+                    if reg:
+                        cursor.execute("""
+                            UPDATE asistencia 
+                            SET estado = %s, justificacion = %s
+                            WHERE asistencia_id = %s;
+                        """, (estado_bd, justificacion, reg['asistencia_id']))
+                    else:
+                        cursor.execute("""
+                            INSERT INTO asistencia (trabajador_id, fecha, estado, justificacion)
+                            VALUES (%s, %s, %s, %s);
+                        """, (trabajador_id, actual, estado_bd, justificacion))
+                    dias_registrados += 1
+                actual += datetime.timedelta(days=1)
+
+            conexion.commit()
+            flash(f"Novedad ({estado_bd.upper()}) registrada exitosamente para {dias_registrados} día(s) hábil(es).", 'success')
+    except Exception as e:
+        conexion.rollback()
+        flash(f"Error al registrar la incidencia: {e}", 'danger')
+    finally:
+        conexion.close()
+
+    return redirect(url_for('asistencia.listar', fecha=fecha_desde))

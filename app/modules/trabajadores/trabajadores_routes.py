@@ -19,7 +19,6 @@ NIVELES_INSTRUCCION = ['Bachiller', 'TSU', 'Licenciado', 'Ingeniero', 'Especiali
 
 # -------------------------------------------------------------------------
 # 1. LISTAR TRABAJADORES ACTIVOS
-# Roles: analista_rrhh, directora_rrhh, tecnico_informatica
 # -------------------------------------------------------------------------
 @trabajadores_bp.route('/')
 def listar():
@@ -31,10 +30,13 @@ def listar():
     conexion = get_db_connection()
     try:
         with conexion.cursor() as cursor:
+            # JOIN con cargo y departamento para recuperar la adscripción real
             sql = """
-                SELECT t.*, c.nombre AS cargo_nombre, u.usuario_id AS cuenta_usuario_id, u.nombre_usuario
+                SELECT t.*, c.nombre AS cargo_nombre, d.nombre AS departamento_nombre,
+                       u.usuario_id AS cuenta_usuario_id, u.nombre_usuario
                 FROM trabajador t
                 INNER JOIN cargo c ON t.cargo_id = c.cargo_id
+                LEFT JOIN departamento d ON c.departamento_id = d.departamento_id
                 LEFT JOIN usuario u ON t.trabajador_id = u.trabajador_id
                 WHERE t.activo = true
                 ORDER BY t.tipo_personal ASC, t.apellidos ASC, t.nombres ASC;
@@ -47,7 +49,6 @@ def listar():
 
 # -------------------------------------------------------------------------
 # 2. CREAR NUEVO TRABAJADOR
-# Roles: directora_rrhh, tecnico_informatica
 # -------------------------------------------------------------------------
 @trabajadores_bp.route('/nuevo', methods=['GET', 'POST'])
 def nuevo():
@@ -77,14 +78,13 @@ def nuevo():
                 banco = request.form.get('banco', '').strip()
                 numero_cuenta = request.form.get('numero_cuenta', '').strip()
 
-                # Validar unicidad de cedula
                 cursor.execute("SELECT trabajador_id FROM trabajador WHERE cedula = %s;", (cedula,))
                 if cursor.fetchone():
                     flash(f'La cédula {cedula} ya se encuentra registrada en el sistema.', 'warning')
-                    cursor.execute("SELECT cargo_id, nombre, sueldo_base FROM cargo WHERE activo = true;")
+                    cursor.execute("SELECT cargo_id, nombre, sueldo_base FROM cargo WHERE activo = true ORDER BY nombre ASC;")
                     cargos = cursor.fetchall()
-                    return render_template('trabajadores/trabajadores_form.html', modo='crear', cargos=cargos,
-                                           tipos_personal=TIPOS_PERSONAL, niveles=NIVELES_INSTRUCCION)
+                    return render_template('trabajadores/trabajadores_form.html', modo='crear', trabajador=None,
+                                           cargos=cargos, tipos_personal=TIPOS_PERSONAL, niveles=NIVELES_INSTRUCCION)
 
                 sql_insert = """
                     INSERT INTO trabajador (
@@ -100,7 +100,6 @@ def nuevo():
                 ))
                 nuevo_id = cursor.lastrowid
 
-                # Auditoría obligatoria en bitácora
                 sql_bitacora = """
                     INSERT INTO bitacora (usuario_id, tabla, registro_id, accion, valor_previo, valor_nuevo, fecha_hora, ip)
                     VALUES (%s, 'trabajador', %s, 'insertar', NULL, %s, %s, %s);
@@ -119,11 +118,10 @@ def nuevo():
                 flash(f'Trabajador {nombres} {apellidos} incorporado con éxito.', 'success')
                 return redirect(url_for('trabajadores.listar'))
 
-            # Si es GET: consultar cargos activos para el selector
-            cursor.execute("SELECT cargo_id, nombre, sueldo_base FROM cargo WHERE activo = true ORDER BY nombre;")
+            cursor.execute("SELECT cargo_id, nombre, sueldo_base FROM cargo WHERE activo = true ORDER BY nombre ASC;")
             cargos = cursor.fetchall()
-            return render_template('trabajadores/trabajadores_form.html', modo='crear', cargos=cargos,
-                                   tipos_personal=TIPOS_PERSONAL, niveles=NIVELES_INSTRUCCION)
+            return render_template('trabajadores/trabajadores_form.html', modo='crear', trabajador=None,
+                                   cargos=cargos, tipos_personal=TIPOS_PERSONAL, niveles=NIVELES_INSTRUCCION)
     except Exception as e:
         conexion.rollback()
         flash(f'Error al registrar trabajador: {e}', 'danger')
@@ -132,8 +130,7 @@ def nuevo():
         conexion.close()
 
 # -------------------------------------------------------------------------
-# 3. EDITAR TRABAJADOR EXISTENTE (Con auditoría JSON en bitácora)
-# Roles: directora_rrhh, tecnico_informatica
+# 3. EDITAR TRABAJADOR EXISTENTE
 # -------------------------------------------------------------------------
 @trabajadores_bp.route('/<int:id>/editar', methods=['GET', 'POST'])
 def editar(id):
@@ -145,7 +142,6 @@ def editar(id):
     conexion = get_db_connection()
     try:
         with conexion.cursor() as cursor:
-            # Obtener estado previo completo
             cursor.execute("SELECT * FROM trabajador WHERE trabajador_id = %s;", (id,))
             valor_previo = cursor.fetchone()
 
@@ -186,30 +182,25 @@ def editar(id):
                     nivel_instruccion, banco, numero_cuenta, id
                 ))
 
-                # Obtener estado posterior exacto
                 cursor.execute("SELECT * FROM trabajador WHERE trabajador_id = %s;", (id,))
                 valor_nuevo = cursor.fetchone()
 
-                # Registro en bitácora exigido por auditoría fiscal
                 sql_bitacora = """
                     INSERT INTO bitacora (usuario_id, tabla, registro_id, accion, valor_previo, valor_nuevo, fecha_hora, ip)
                     VALUES (%s, 'trabajador', %s, 'modificar', %s, %s, %s, %s);
                 """
                 cursor.execute(sql_bitacora, (
-                    session['usuario_id'],
-                    id,
+                    session['usuario_id'], id,
                     json.dumps(valor_previo, default=str),
                     json.dumps(valor_nuevo, default=str),
-                    datetime.datetime.now(),
-                    request.remote_addr
+                    datetime.datetime.now(), request.remote_addr
                 ))
 
                 conexion.commit()
-                flash(f'Expediente de {nombres} {apellidos} actualizado y registrado en auditoría.', 'success')
+                flash(f'Expediente de {nombres} {apellidos} actualizado con éxito.', 'success')
                 return redirect(url_for('trabajadores.listar'))
 
-            # Si es GET: consultar cargos y cargar formulario con datos previos
-            cursor.execute("SELECT cargo_id, nombre, sueldo_base FROM cargo WHERE activo = true ORDER BY nombre;")
+            cursor.execute("SELECT cargo_id, nombre, sueldo_base FROM cargo WHERE activo = true ORDER BY nombre ASC;")
             cargos = cursor.fetchall()
             return render_template('trabajadores/trabajadores_form.html', modo='editar', trabajador=valor_previo,
                                    cargos=cargos, tipos_personal=TIPOS_PERSONAL, niveles=NIVELES_INSTRUCCION)
@@ -221,14 +212,13 @@ def editar(id):
         conexion.close()
 
 # -------------------------------------------------------------------------
-# 4. DESACTIVAR TRABAJADOR (Baja lógica inalterable para Contraloría)
-# Roles: directora_rrhh, tecnico_informatica
+# 4. DESACTIVAR TRABAJADOR (Baja Lógica)
 # -------------------------------------------------------------------------
 @trabajadores_bp.route('/<int:id>/desactivar', methods=['POST'])
 def desactivar(id):
     roles_permitidos = ['directora_rrhh', 'tecnico_informatica']
     if 'usuario_id' not in session or session.get('rol') not in roles_permitidos:
-        flash('Acceso denegado: No tiene permisos para tramitar bajas de personal.', 'danger')
+        flash('Acceso denegado.', 'danger')
         return redirect(url_for('trabajadores.listar'))
 
     conexion = get_db_connection()
@@ -238,33 +228,27 @@ def desactivar(id):
             valor_previo = cursor.fetchone()
 
             if not valor_previo:
-                flash('El trabajador no existe o ya se encuentra egresado.', 'warning')
+                flash('El trabajador no existe o ya está inactivo.', 'warning')
                 return redirect(url_for('trabajadores.listar'))
 
             hoy = datetime.date.today()
-            # Desactivar trabajador y colocar fecha_egreso (nunca DELETE)
             cursor.execute("UPDATE trabajador SET activo = false, fecha_egreso = %s WHERE trabajador_id = %s;", (hoy, id))
-
-            # Desactivar cuenta de usuario asociada si la tuviera
             cursor.execute("UPDATE usuario SET activo = false WHERE trabajador_id = %s;", (id,))
 
-            # Registrar en bitácora con acción eliminar
             valor_nuevo = {'activo': False, 'fecha_egreso': str(hoy)}
             sql_bitacora = """
                 INSERT INTO bitacora (usuario_id, tabla, registro_id, accion, valor_previo, valor_nuevo, fecha_hora, ip)
                 VALUES (%s, 'trabajador', %s, 'eliminar', %s, %s, %s, %s);
             """
             cursor.execute(sql_bitacora, (
-                session['usuario_id'],
-                id,
+                session['usuario_id'], id,
                 json.dumps(valor_previo, default=str),
                 json.dumps(valor_nuevo, default=str),
-                datetime.datetime.now(),
-                request.remote_addr
+                datetime.datetime.now(), request.remote_addr
             ))
 
             conexion.commit()
-            flash(f"Trabajador {valor_previo['nombres']} {valor_previo['apellidos']} egresado del sistema con éxito.", 'info')
+            flash(f"Trabajador {valor_previo['nombres']} {valor_previo['apellidos']} egresado con éxito.", 'info')
     except Exception as e:
         conexion.rollback()
         flash(f'Error al procesar egreso: {e}', 'danger')
@@ -274,139 +258,44 @@ def desactivar(id):
     return redirect(url_for('trabajadores.listar'))
 
 # -------------------------------------------------------------------------
-# 5. CREAR CUENTA DE USUARIO LIGADA
-# Rol exclusivo: tecnico_informatica
-# -------------------------------------------------------------------------
-@trabajadores_bp.route('/<int:id>/crear-usuario', methods=['GET', 'POST'])
-def crear_usuario(id):
-    roles_permitidos = ['tecnico_informatica']
-    if 'usuario_id' not in session or session.get('rol') not in roles_permitidos:
-        flash('Acceso denegado: La administración y creación de cuentas de usuario es competencia exclusiva del Técnico de Informática.', 'danger')
-        return redirect(url_for('trabajadores.listar'))
-
-    conexion = get_db_connection()
-    try:
-        with conexion.cursor() as cursor:
-            cursor.execute("SELECT * FROM trabajador WHERE trabajador_id = %s AND activo = true;", (id,))
-            trabajador = cursor.fetchone()
-
-            if not trabajador:
-                flash('El trabajador no existe o se encuentra inactivo.', 'warning')
-                return redirect(url_for('trabajadores.listar'))
-
-            # Verificar si ya posee cuenta
-            cursor.execute("SELECT usuario_id, nombre_usuario FROM usuario WHERE trabajador_id = %s;", (id,))
-            cuenta_existente = cursor.fetchone()
-            if cuenta_existente:
-                flash(f"Este trabajador ya posee la cuenta '{cuenta_existente['nombre_usuario']}'.", 'warning')
-                return redirect(url_for('trabajadores.listar'))
-
-            if request.method == 'POST':
-                nombre_usuario = request.form.get('nombre_usuario', '').strip().lower()
-                clave_temporal = request.form.get('clave', '').strip()
-                rol_id = request.form.get('rol_id')
-
-                if not nombre_usuario or not clave_temporal or not rol_id:
-                    flash('Todos los campos del formulario de usuario son obligatorios.', 'warning')
-                    cursor.execute("SELECT rol_id, nombre, descripcion FROM rol ORDER BY rol_id;")
-                    roles = cursor.fetchall()
-                    return render_template('trabajadores/trabajadores_usuario.html', trabajador=trabajador, roles=roles)
-
-                # Comprobar disponibilidad de nombre_usuario
-                cursor.execute("SELECT usuario_id FROM usuario WHERE nombre_usuario = %s;", (nombre_usuario,))
-                if cursor.fetchone():
-                    flash(f"El nombre de usuario '{nombre_usuario}' ya está en uso.", 'danger')
-                    cursor.execute("SELECT rol_id, nombre, descripcion FROM rol ORDER BY rol_id;")
-                    roles = cursor.fetchall()
-                    return render_template('trabajadores/trabajadores_usuario.html', trabajador=trabajador, roles=roles)
-
-                # Generar hash seguro e insertar
-                clave_hash = generate_password_hash(clave_temporal)
-                ahora = datetime.datetime.now()
-
-                sql_usuario = """
-                    INSERT INTO usuario (trabajador_id, rol_id, nombre_usuario, clave_hash, creado_en, activo)
-                    VALUES (%s, %s, %s, %s, %s, true);
-                """
-                cursor.execute(sql_usuario, (id, rol_id, nombre_usuario, clave_hash, ahora))
-                nuevo_usuario_id = cursor.lastrowid
-
-                # Auditoría en bitácora
-                sql_bitacora = """
-                    INSERT INTO bitacora (usuario_id, tabla, registro_id, accion, valor_previo, valor_nuevo, fecha_hora, ip)
-                    VALUES (%s, 'usuario', %s, 'insertar', NULL, %s, %s, %s);
-                """
-                datos_nuevos = {
-                    'usuario_id': nuevo_usuario_id,
-                    'trabajador_id': id,
-                    'rol_id': rol_id,
-                    'nombre_usuario': nombre_usuario,
-                    'activo': True
-                }
-                cursor.execute(sql_bitacora, (
-                    session['usuario_id'],
-                    nuevo_usuario_id,
-                    json.dumps(datos_nuevos, default=str),
-                    ahora,
-                    request.remote_addr
-                ))
-
-                conexion.commit()
-                flash(f"Cuenta '{nombre_usuario}' creada exitosamente y vinculada al trabajador.", 'success')
-                return redirect(url_for('trabajadores.listar'))
-
-            # Si es GET: listar roles disponibles para el select
-            cursor.execute("SELECT rol_id, nombre, descripcion FROM rol ORDER BY rol_id;")
-            roles = cursor.fetchall()
-            return render_template('trabajadores/trabajadores_usuario.html', trabajador=trabajador, roles=roles)
-    except Exception as e:
-        conexion.rollback()
-        flash(f'Error al crear cuenta de usuario: {e}', 'danger')
-        return redirect(url_for('trabajadores.listar'))
-    finally:
-        conexion.close()
-        
-# -------------------------------------------------------------------------
-# 6. BANDEJA DE SOLICITUDES DE ACTUALIZACIÓN DE PERFIL
-# Rol exclusivo: directora_rrhh
+# 5. BANDEJA Y PROCESAMIENTO DE SOLICITUDES DE PERFIL
 # -------------------------------------------------------------------------
 @trabajadores_bp.route('/solicitudes')
 def solicitudes():
-    if 'usuario_id' not in session or session.get('rol') != 'directora_rrhh':
-        flash('Acceso denegado: Solo la Directora de RRHH puede gestionar solicitudes de perfil.', 'danger')
+    if 'usuario_id' not in session or session.get('rol') not in ['directora_rrhh', 'analista_rrhh', 'tecnico_informatica']:
+        flash('Acceso restringido.', 'danger')
         return redirect(url_for('auth.dashboard'))
 
     conexion = get_db_connection()
     try:
         with conexion.cursor() as cursor:
             sql = """
-                SELECT s.solicitud_id, s.trabajador_id, s.campo, s.valor_actual, s.valor_nuevo,
-                       s.estado, s.fecha_solicitud, s.fecha_respuesta, s.motivo_rechazo,
-                       t.cedula, t.nombres, t.apellidos, c.nombre AS cargo_nombre
+                SELECT s.solicitud_id, s.trabajador_id, s.campo, s.valor_actual, 
+                       s.valor_nuevo, s.estado, s.fecha_solicitud, s.fecha_respuesta, 
+                       s.motivo_rechazo, t.cedula, t.nombres, t.apellidos,
+                       c.nombre AS cargo_nombre, d.nombre AS departamento_nombre
                 FROM solicitud_cambio_perfil s
                 INNER JOIN trabajador t ON s.trabajador_id = t.trabajador_id
-                INNER JOIN cargo c ON t.cargo_id = c.cargo_id
-                ORDER BY CASE WHEN s.estado = 'pendiente' THEN 1 ELSE 2 END,
-                         s.solicitud_id DESC;
+                LEFT JOIN cargo c ON t.cargo_id = c.cargo_id
+                LEFT JOIN departamento d ON c.departamento_id = d.departamento_id
+                ORDER BY s.solicitud_id DESC;
             """
             cursor.execute(sql)
-            solicitudes_lista = cursor.fetchall()
-            return render_template('trabajadores/trabajadores_solicitudes.html', solicitudes=solicitudes_lista)
+            todas = cursor.fetchall()
+            pendientes = [s for s in todas if s['estado'] == 'pendiente']
+            procesadas = [s for s in todas if s['estado'] != 'pendiente']
+            return render_template('trabajadores/trabajadores_solicitudes.html', pendientes=pendientes, procesadas=procesadas)
     finally:
         conexion.close()
 
-# -------------------------------------------------------------------------
-# 7. PROCESAR SOLICITUD (APROBAR O RECHAZAR)
-# Actualiza la ficha del trabajador y audita en bitácora
-# -------------------------------------------------------------------------
 @trabajadores_bp.route('/solicitudes/<int:id>/procesar', methods=['POST'])
 def procesar_solicitud(id):
-    if 'usuario_id' not in session or session.get('rol') != 'directora_rrhh':
-        flash('Acceso denegado.', 'danger')
-        return redirect(url_for('auth.dashboard'))
+    if 'usuario_id' not in session or session.get('rol') not in ['directora_rrhh', 'analista_rrhh']:
+        flash('Acceso no autorizado.', 'danger')
+        return redirect(url_for('trabajadores.solicitudes'))
 
-    accion = request.form.get('accion')  # 'aprobar' o 'rechazar'
-    motivo_rechazo = request.form.get('motivo_rechazo', '').strip()
+    accion = request.form.get('accion')
+    motivo = request.form.get('motivo_rechazo', '').strip()
 
     conexion = get_db_connection()
     try:
@@ -415,68 +304,106 @@ def procesar_solicitud(id):
             solicitud = cursor.fetchone()
 
             if not solicitud or solicitud['estado'] != 'pendiente':
-                flash('La solicitud no existe o ya fue procesada previamente.', 'warning')
+                flash('La solicitud ya fue procesada o no existe.', 'warning')
                 return redirect(url_for('trabajadores.solicitudes'))
 
-            trabajador_id = solicitud['trabajador_id']
             ahora = datetime.datetime.now()
-
-            # Obtener estado previo del trabajador para bitácora
-            cursor.execute("SELECT * FROM trabajador WHERE trabajador_id = %s;", (trabajador_id,))
-            valor_previo = cursor.fetchone()
+            campos_permitidos = ['telefono', 'correo', 'direccion']
 
             if accion == 'aprobar':
-                campo = solicitud['campo']
-                valor_nuevo = solicitud['valor_nuevo']
-
-                # Actualización protegida sobre el expediente
-                if campo in ['telefono', 'correo', 'direccion']:
-                    sql_update = f"UPDATE trabajador SET {campo} = %s WHERE trabajador_id = %s;"
-                    cursor.execute(sql_update, (valor_nuevo, trabajador_id))
-
-                # Marcar solicitud como aprobada
-                cursor.execute("""
-                    UPDATE solicitud_cambio_perfil 
-                    SET estado = 'aprobada', revisada_por = %s, fecha_respuesta = %s 
-                    WHERE solicitud_id = %s;
-                """, (session['usuario_id'], ahora, id))
-
-                # Obtener estado posterior del trabajador
-                cursor.execute("SELECT * FROM trabajador WHERE trabajador_id = %s;", (trabajador_id,))
-                valor_nuevo_db = cursor.fetchone()
-
-                # Auditoría en bitácora
-                sql_bitacora = """
-                    INSERT INTO bitacora (usuario_id, tabla, registro_id, accion, valor_previo, valor_nuevo, fecha_hora, ip)
-                    VALUES (%s, 'trabajador', %s, 'modificar', %s, %s, %s, %s);
-                """
-                cursor.execute(sql_bitacora, (
-                    session['usuario_id'],
-                    trabajador_id,
-                    json.dumps(valor_previo, default=str),
-                    json.dumps(valor_nuevo_db, default=str),
-                    ahora,
-                    request.remote_addr
-                ))
-
-                conexion.commit()
-                flash(f"Solicitud #{id} APROBADA. El campo '{campo}' de {valor_previo['nombres']} {valor_previo['apellidos']} ha sido actualizado.", 'success')
+                campo = solicitud['campo'].lower().strip()
+                if campo in campos_permitidos:
+                    sql_up = f"UPDATE trabajador SET {campo} = %s WHERE trabajador_id = %s;"
+                    cursor.execute(sql_up, (solicitud['valor_nuevo'], solicitud['trabajador_id']))
+                    cursor.execute("UPDATE solicitud_cambio_perfil SET estado = 'aprobada', fecha_respuesta = %s WHERE solicitud_id = %s;", (ahora, id))
+                    conexion.commit()
+                    flash(f"Solicitud #{id} APROBADA. Expediente actualizado con el nuevo {campo}.", 'success')
+                else:
+                    flash('Campo no autorizado.', 'danger')
 
             elif accion == 'rechazar':
-                motivo_final = motivo_rechazo if motivo_rechazo else 'No cumple con los requisitos institucionales.'
                 cursor.execute("""
-                    UPDATE solicitud_cambio_perfil 
-                    SET estado = 'rechazada', revisada_por = %s, fecha_respuesta = %s, motivo_rechazo = %s 
+                    UPDATE solicitud_cambio_perfil
+                    SET estado = 'rechazada', fecha_respuesta = %s, motivo_rechazo = %s
                     WHERE solicitud_id = %s;
-                """, (session['usuario_id'], ahora, motivo_final, id))
-
+                """, (ahora, motivo or 'Rechazada por la Dirección de Recursos Humanos.', id))
                 conexion.commit()
-                flash(f"Solicitud #{id} marcada como RECHAZADA.", 'info')
-
+                flash(f"Solicitud #{id} rechazada.", 'warning')
     except Exception as e:
         conexion.rollback()
-        flash(f'Error al procesar la solicitud: {e}', 'danger')
+        flash(f'Error al procesar: {e}', 'danger')
     finally:
         conexion.close()
 
     return redirect(url_for('trabajadores.solicitudes'))
+
+# -------------------------------------------------------------------------
+# RRHH: Bandeja de Constancias de Trabajo
+# -------------------------------------------------------------------------
+@trabajadores_bp.route('/constancias')
+def constancias_admin():
+    roles_permitidos = ['directora_rrhh', 'analista_rrhh', 'tecnico_informatica']
+    if 'usuario_id' not in session or session.get('rol') not in roles_permitidos:
+        flash('Acceso denegado a la gestión de constancias.', 'danger')
+        return redirect(url_for('auth.dashboard'))
+
+    conexion = get_db_connection()
+    try:
+        with conexion.cursor() as cursor:
+            sql = """
+                SELECT sc.*, t.cedula, t.nombres, t.apellidos, c.nombre AS cargo_nombre
+                FROM solicitud_constancia sc
+                INNER JOIN trabajador t ON sc.trabajador_id = t.trabajador_id
+                INNER JOIN cargo c ON t.cargo_id = c.cargo_id
+                ORDER BY sc.constancia_id DESC;
+            """
+            cursor.execute(sql)
+            todas = cursor.fetchall()
+            pendientes = [c for c in todas if c['estado'] == 'pendiente']
+            emitidas = [c for c in todas if c['estado'] != 'pendiente']
+
+            return render_template('trabajadores/trabajadores_constancias.html', pendientes=pendientes, emitidas=emitidas)
+    finally:
+        conexion.close()
+
+# -------------------------------------------------------------------------
+# RRHH: Emitir o Rechazar Constancia de Trabajo
+# -------------------------------------------------------------------------
+@trabajadores_bp.route('/constancias/<int:constancia_id>/procesar', methods=['POST'])
+def procesar_constancia(constancia_id):
+    if 'usuario_id' not in session or session.get('rol') not in ['directora_rrhh', 'analista_rrhh']:
+        flash('Acceso no autorizado.', 'danger')
+        return redirect(url_for('trabajadores.constancias_admin'))
+
+    accion = request.form.get('accion') # 'emitir' o 'rechazar'
+    motivo = request.form.get('motivo_rechazo', '').strip()
+
+    conexion = get_db_connection()
+    try:
+        with conexion.cursor() as cursor:
+            ahora = datetime.datetime.now()
+            if accion == 'emitir':
+                # Generar correlativo institucional formal: DTH-CT-YYYY-XXXX
+                correlativo = f"DTH-CT-{ahora.year}-{constancia_id:04d}"
+                cursor.execute("""
+                    UPDATE solicitud_constancia
+                    SET estado = 'emitida', correlativo = %s, fecha_emision = %s,
+                        emitida_por = %s, motivo_rechazo = NULL
+                    WHERE constancia_id = %s;
+                """, (correlativo, ahora, session['usuario_id'], constancia_id))
+                conexion.commit()
+                flash(f'Constancia #{constancia_id} emitida exitosamente con correlativo {correlativo}.', 'success')
+
+            elif accion == 'rechazar':
+                cursor.execute("""
+                    UPDATE solicitud_constancia
+                    SET estado = 'rechazada', fecha_emision = %s,
+                        emitida_por = %s, motivo_rechazo = %s
+                    WHERE constancia_id = %s;
+                """, (ahora, session['usuario_id'], motivo or 'Rechazada por la Dirección de Talento Humano.', constancia_id))
+                conexion.commit()
+                flash(f'Solicitud de constancia #{constancia_id} rechazada.', 'warning')
+    finally:
+        conexion.close()
+
+    return redirect(url_for('trabajadores.constancias_admin'))

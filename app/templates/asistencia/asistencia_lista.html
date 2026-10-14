@@ -1,132 +1,418 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Control de Asistencia - Concejo Municipal</title>
-    <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); margin-bottom: 20px; }
-        h2, h3 { color: #2c3e50; margin-top: 0; }
-        .filter-bar { display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap; margin-bottom: 15px; }
-        .filter-group { display: flex; align-items: center; gap: 10px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; vertical-align: middle; }
-        th { background-color: #2c3e50; color: white; }
-        .btn { padding: 8px 14px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: bold; cursor: pointer; border: none; display: inline-block; }
-        .btn-success { background: #27ae60; color: white; }
-        .btn-primary { background: #0056b3; color: white; }
-        .btn-secondary { background: #6c757d; color: white; }
-        .badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; color: white; text-transform: uppercase; }
-        .badge-presente { background: #27ae60; }
-        .badge-falta_justificada { background: #3498db; }
-        .badge-falta_injustificada { background: #e74c3c; }
-        .badge-reposo { background: #e67e22; }
-        .badge-vacaciones { background: #9b59b6; }
-        .badge-permiso { background: #f39c12; }
-        .alert { padding: 10px; border-radius: 4px; margin-bottom: 15px; font-size: 13px; }
-        .alert-success { background-color: #d4edda; color: #155724; }
-        .alert-warning { background-color: #fff3cd; color: #856404; }
-        .alert-danger { background-color: #f8d7da; color: #721c24; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-            <h2>Control Diario de Asistencia y Novedades</h2>
-            <div>
-                <a href="{{ url_for('asistencia.nueva') }}" class="btn btn-success">+ Cargar Novedad Individual</a>
-                <a href="{{ url_for('auth.dashboard') }}" class="btn btn-secondary">Regresar al Panel</a>
+{% extends "base.html" %}
+
+{% block title %}Control de Asistencia Diaria{% endblock %}
+
+{% block content %}
+<!-- Cabecera de Página y Acciones Rápidas -->
+<div class="page-header d-print-none mb-3">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="text-muted small text-uppercase fw-bold">Gestión de Talento Humano</div>
+            <h2 class="page-title text-dark">
+                Control Diario de Asistencia y Novedades
+            </h2>
+            <div class="text-muted mt-1">
+                Jornada: <strong>{{ fecha_formateada }}</strong> · Concejo Municipal de Independencia
             </div>
         </div>
-
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }}">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-
-        <!-- Barra de Carga Rápida y Filtros -->
-        <div class="card">
-            <div class="filter-bar">
-                <!-- Filtro de Consulta -->
-                <form method="GET" action="{{ url_for('asistencia.listar') }}" class="filter-group">
-                    <label><strong>Fecha:</strong></label>
-                    <input type="date" name="fecha" value="{{ fecha_filtro }}" style="padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
-                    
-                    <label><strong>Tipo:</strong></label>
-                    <select name="tipo_personal" style="padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
-                        <option value="">Todos los grupos</option>
-                        <option value="empleado_fijo" {% if tipo_filtro == 'empleado_fijo' %}selected{% endif %}>Empleado Fijo</option>
-                        <option value="obrero_fijo" {% if tipo_filtro == 'obrero_fijo' %}selected{% endif %}>Obrero Fijo</option>
-                        <option value="alto_nivel" {% if tipo_filtro == 'alto_nivel' %}selected{% endif %}>Alto Nivel</option>
-                        <option value="libre_remocion" {% if tipo_filtro == 'libre_remocion' %}selected{% endif %}>Libre Nombramiento</option>
-                        <option value="empleado_contratado" {% if tipo_filtro == 'empleado_contratado' %}selected{% endif %}>Empleado Contratado</option>
-                        <option value="obrero_contratado" {% if tipo_filtro == 'obrero_contratado' %}selected{% endif %}>Obrero Contratado</option>
-                    </select>
-                    <button type="submit" class="btn btn-primary">Filtrar</button>
-                </form>
-
-                <!-- Carga Masiva Ordinaria (Presente) -->
-                <form method="POST" action="{{ url_for('asistencia.carga_diaria') }}" class="filter-group" style="border-left: 1px solid #ddd; padding-left: 15px;">
-                    <input type="hidden" name="fecha_carga" value="{{ fecha_filtro }}">
-                    <label><strong>Carga Ordinaria:</strong></label>
-                    <select name="tipo_personal_carga" required style="padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
-                        <option value="">Seleccione grupo...</option>
-                        <option value="empleado_fijo">Empleados Fijos</option>
-                        <option value="obrero_fijo">Obreros Fijos</option>
-                        <option value="alto_nivel">Alto Nivel</option>
-                        <option value="libre_remocion">Libre Nombramiento</option>
-                        <option value="empleado_contratado">Empleados Contratados</option>
-                        <option value="obrero_contratado">Obreros Contratados</option>
-                    </select>
-                    <button type="submit" class="btn btn-secondary" onclick="return confirm('¿Registrar presencia para los funcionarios sin novedad cargada en este grupo?');">
-                        ⚡ Marcar Presentes
-                    </button>
-                </form>
-            </div>
-        </div>
-
-        <!-- Tabla de Registros -->
-        <div class="card">
-            <h3>Registros del día: {{ fecha_filtro }}</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>N°</th>
-                        <th>Cédula</th>
-                        <th>Funcionario</th>
-                        <th>Cargo</th>
-                        <th>Tipo Personal</th>
-                        <th>Estado de Asistencia</th>
-                        <th>Observación Administrativa</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for r in registros %}
-                    <tr>
-                        <td>#{{ r.asistencia_id }}</td>
-                        <td><strong>{{ r.cedula }}</strong></td>
-                        <td>{{ r.nombres }} {{ r.apellidos }}</td>
-                        <td>{{ r.cargo_nombre }}</td>
-                        <td>{{ r.tipo_personal }}</td>
-                        <td>
-                            <span class="badge badge-{{ r.estado }}">{{ r.estado|replace('_', ' ') }}</span>
-                        </td>
-                        <td style="color: #555;">{{ r.observacion or '—' }}</td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="7" style="text-align: center; color: #7f8c8d; padding: 25px;">
-                            No existen registros de asistencia para esta fecha. Use el botón superior para cargar novedades o el selector de carga ordinaria.
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div class="col-auto ms-auto d-flex gap-2">
+            <button type="button" class="btn btn-outline-danger" onclick="abrirModalNovedad('falta')">
+                <span>🚫</span> Falta Injustificada
+            </button>
+            <button type="button" class="btn btn-outline-info" onclick="abrirModalNovedad('reposo')">
+                <span>🩺</span> Reposo Médico (IVSS)
+            </button>
+            <button type="button" class="btn btn-success" id="btnMarcarPresente" onclick="marcarPresentesSeleccionados()" {% if es_futuro %}disabled{% endif %}>
+                <span>✓</span> <span id="lblBtnPresente">Marcar Presentes Masivo ({{ conteos.sin_marcar }})</span>
+            </button>
         </div>
     </div>
-</body>
-</html>
+</div>
+
+<!-- Banners de Alerta Contextual (Adaptado de alert-banner.tsx) -->
+<div class="mb-3">
+    {% if es_futuro %}
+    <div class="alert alert-info d-flex align-items-center" role="alert">
+        <span class="fs-2 me-2">ℹ️</span>
+        <div>
+            <strong>Fecha futura:</strong> La asistencia regular solo se registra en la jornada correspondiente. Puede pre-cargar reposos médicos avalados.
+        </div>
+    </div>
+    {% endif %}
+
+    {% if es_hoy and conteos.sin_marcar > 0 %}
+    <div class="alert alert-warning d-flex align-items-center justify-content-between" role="alert">
+        <div class="d-flex align-items-center">
+            <span class="fs-2 me-2">⚠️</span>
+            <div>
+                Hay <strong>{{ conteos.sin_marcar }} funcionario(s)</strong> sin registro de asistencia en la jornada de hoy.
+                <div class="small text-muted">Las incidencias no justificadas se descuentan en el cierre de nómina quincenal.</div>
+            </div>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-dark" onclick="filtrarEstado('sin_marcar', document.getElementById('btnFiltroSinMarcar'))">
+            Filtrar Pendientes
+        </button>
+    </div>
+    {% endif %}
+
+    {% if not es_futuro and conteos.falta > 0 %}
+    <div class="alert alert-danger d-flex align-items-center" role="alert">
+        <span class="fs-2 me-2">🛑</span>
+        <div>
+            Se registran <strong>{{ conteos.falta }} inasistencia(s) injustificada(s)</strong> en esta fecha. Estas afectarán el pago de la quincena a menos que se consigne reposo médico.
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Contenedor Principal: Filtros y Tabla -->
+<div class="card">
+    <!-- Barra Superior: Selector de Fecha, Departamento y Búsqueda -->
+    <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2 py-2">
+        <!-- Navegador de Fechas -->
+        <div class="d-flex align-items-center gap-1">
+            <a href="{{ url_for('asistencia.listar', fecha=fecha_anterior) }}" class="btn btn-icon btn-sm btn-outline-secondary" title="Día Anterior">
+                ‹
+            </a>
+            <input type="date" id="inputFecha" class="form-control form-control-sm font-monospace" value="{{ fecha_activa }}" onchange="cambiarFecha(this.value)">
+            <a href="{{ url_for('asistencia.listar', fecha=fecha_siguiente) }}" class="btn btn-icon btn-sm btn-outline-secondary" title="Día Siguiente">
+                ›
+            </a>
+            <a href="{{ url_for('asistencia.listar') }}" class="btn btn-sm btn-light {% if es_hoy %}disabled{% endif %}">
+                Hoy
+            </a>
+        </div>
+
+        <!-- Filtro por Departamento y Búsqueda -->
+        <div class="d-flex align-items-center gap-2 ms-auto">
+            <select id="filtroDepto" class="form-select form-select-sm" style="width: 220px;" onchange="filtrarTabla()">
+                <option value="todos">Todos los departamentos</option>
+                {% for d in departamentos %}
+                <option value="{{ d.nombre }}">{{ d.nombre }}</option>
+                {% endfor %}
+            </select>
+            <div class="input-icon">
+                <input type="text" id="inputBusqueda" class="form-control form-control-sm" placeholder="Buscar por cédula o nombre..." onkeyup="filtrarTabla()" style="width: 230px;">
+            </div>
+        </div>
+    </div>
+
+    <!-- Píldoras de Filtro por Estado (Adaptado de attendance-badge.tsx) -->
+    <div class="p-2 border-bottom bg-light d-flex gap-1 overflow-auto">
+        <button type="button" class="btn btn-sm btn-white active" onclick="filtrarEstado('todos', this)">
+            Todos <span class="badge bg-secondary-lt ms-1">{{ conteos.todos }}</span>
+        </button>
+        <button type="button" class="btn btn-sm btn-white" onclick="filtrarEstado('presente', this)">
+            <span class="badge-dot bg-success me-1"></span> Presente <span class="badge bg-success-lt ms-1">{{ conteos.presente }}</span>
+        </button>
+        <button type="button" class="btn btn-sm btn-white" onclick="filtrarEstado('reposo', this)">
+            <span class="badge-dot bg-info me-1"></span> Reposo Médico <span class="badge bg-info-lt ms-1">{{ conteos.reposo }}</span>
+        </button>
+        <button type="button" class="btn btn-sm btn-white" onclick="filtrarEstado('falta', this)">
+            <span class="badge-dot bg-danger me-1"></span> Falta Injustificada <span class="badge bg-danger-lt ms-1">{{ conteos.falta }}</span>
+        </button>
+        <button type="button" class="btn btn-sm btn-white" id="btnFiltroSinMarcar" onclick="filtrarEstado('sin_marcar', this)">
+            <span class="badge-dot bg-warning me-1"></span> Sin Marcar <span class="badge bg-warning-lt ms-1">{{ conteos.sin_marcar }}</span>
+        </button>
+    </div>
+
+    <!-- Barra de Selección Masiva Dinámica -->
+    <div id="barraSeleccion" class="bg-blue-lt px-3 py-2 d-none justify-content-between align-items-center border-bottom">
+        <div>
+            <strong id="cantSeleccionados">0</strong> funcionarios seleccionados
+        </div>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-sm btn-success" onclick="marcarPresentesSeleccionados()">Marcar como Presentes</button>
+            <button type="button" class="btn btn-sm btn-link text-muted" onclick="deseleccionarTodos()">Cancelar</button>
+        </div>
+    </div>
+
+    <!-- Tabla Densa de Asistencia (Adaptado de attendance-view.tsx) -->
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-hover" id="tablaAsistencia">
+            <thead>
+                <tr>
+                    <th class="w-1">
+                        <input type="checkbox" id="checkTodos" class="form-check-input" onchange="alternarTodos(this)">
+                    </th>
+                    <th>Funcionario</th>
+                    <th>Departamento / Adscripción</th>
+                    <th>Estado de Jornada</th>
+                    <th>Observación / Justificación</th>
+                    <th class="w-1 text-center">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in trabajadores %}
+                <tr class="fila-trabajador" data-estado="{{ t.estado_normalizado }}" data-depto="{{ t.departamento_nombre or '' }}">
+                    <td>
+                        <input type="checkbox" class="form-check-input check-fila" value="{{ t.trabajador_id }}" onchange="actualizarSeleccion()">
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <span class="avatar avatar-sm bg-secondary-lt text-dark rounded-circle me-2 fw-bold">
+                                {{ t.iniciales }}
+                            </span>
+                            <div>
+                                <div class="fw-bold text-dark nombre-trabajador">{{ t.nombres }} {{ t.apellidos }}</div>
+                                <div class="text-muted small font-monospace">C.I. {{ t.cedula }} · {{ t.cargo_nombre }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="badge bg-light text-muted border">{{ t.departamento_nombre or 'Sin adscripción' }}</span>
+                    </td>
+                    <td>
+                        {% if t.estado_normalizado == 'presente' %}
+                            <span class="badge bg-success-lt text-uppercase"><span class="badge-dot bg-success me-1"></span>Presente</span>
+                        {% elif t.estado_normalizado == 'reposo' %}
+                            <span class="badge bg-info-lt text-uppercase"><span class="badge-dot bg-info me-1"></span>Reposo Médico</span>
+                        {% elif t.estado_normalizado == 'falta' %}
+                            <span class="badge bg-danger-lt text-uppercase"><span class="badge-dot bg-danger me-1"></span>Injustificada</span>
+                        {% elif t.estado_normalizado == 'vacaciones' %}
+                            <span class="badge bg-purple-lt text-uppercase"><span class="badge-dot bg-purple me-1"></span>Vacaciones</span>
+                        {% else %}
+                            <span class="badge bg-secondary-lt text-uppercase"><span class="badge-dot bg-secondary me-1"></span>Sin Marcar</span>
+                        {% endif %}
+                    </td>
+                    <td class="small text-muted text-truncate" style="max-width: 220px;" title="{{ t.justificacion or '' }}">
+                        {{ t.justificacion or '—' }}
+                    </td>
+                    <td class="text-center">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="abrirModalNovedad('reposo', '{{ t.trabajador_id }}')" title="Registrar Novedad">
+                            ✏️ Novedad
+                        </button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">
+                        No hay personal activo registrado en el sistema.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ---------------------------------------------------------------------- -->
+<!-- Modal de Registro de Novedades (Adaptado de register-dialog.tsx) -->
+<!-- ---------------------------------------------------------------------- -->
+<div class="modal fade" id="modalNovedad" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="POST" action="{{ url_for('asistencia.registrar_novedad') }}" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="modalTitulo">Registrar Novedad Laboral</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Tipo de Incidencia -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Tipo de Incidencia:</label>
+                    <div class="btn-group w-100" role="group">
+                        <input type="radio" class="btn-check" name="tipo" id="tipoReposo" value="reposo" checked onchange="cambiarTipoNovedad('reposo')">
+                        <label class="btn btn-outline-info" for="tipoReposo">🩺 Reposo Médico</label>
+
+                        <input type="radio" class="btn-check" name="tipo" id="tipoFalta" value="falta" onchange="cambiarTipoNovedad('falta')">
+                        <label class="btn btn-outline-danger" for="tipoFalta">🚫 Inasistencia Injustificada</label>
+                    </div>
+                </div>
+
+                <!-- Selección de Funcionario -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Funcionario:</label>
+                    <select name="trabajador_id" id="modalTrabajadorSelect" class="form-select" required>
+                        <option value="" disabled selected>Seleccione el trabajador...</option>
+                        {% for t in trabajadores %}
+                        <option value="{{ t.trabajador_id }}">{{ t.apellidos }}, {{ t.nombres }} (C.I. {{ t.cedula }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Rango de Fechas -->
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label fw-bold" id="lblDesde">Desde:</label>
+                        <input type="date" name="desde" id="modalDesde" class="form-control" value="{{ fecha_activa }}" required>
+                    </div>
+                    <div class="col-6" id="campoHasta">
+                        <label class="form-label fw-bold">Hasta:</label>
+                        <input type="date" name="hasta" id="modalHasta" class="form-control" value="{{ fecha_activa }}">
+                    </div>
+                </div>
+
+                <!-- Certificado Médico (Visible solo en reposo) -->
+                <div class="mb-3" id="campoCertificado">
+                    <label class="form-label fw-bold">N° Certificado / Aval IVSS:</label>
+                    <input type="text" name="certificado" class="form-control" placeholder="Ej: IVSS-2026-8894 / Centro Ambulatorio">
+                    <small class="text-muted">Consignado ante RRHH en el lapso reglamentario de 48 horas.</small>
+                </div>
+
+                <!-- Observaciones -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Observaciones / Motivo:</label>
+                    <textarea name="observaciones" rows="2" class="form-control" placeholder="Detalle adicional relevante para el expediente..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Registrar en Asistencia</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let estadoFiltroActivo = 'todos';
+    const modalNovedadBS = new bootstrap.Modal(document.getElementById('modalNovedad'));
+
+    function cambiarFecha(fecha) {
+        window.location.href = "{{ url_for('asistencia.listar') }}?fecha=" + fecha;
+    }
+
+    // Filtrar tabla dinámicamente
+    function filtrarEstado(estado, btn) {
+        estadoFiltroActivo = estado;
+        document.querySelectorAll('.p-2.border-bottom .btn').forEach(b => b.classList.remove('active'));
+        if (btn) btn.classList.add('active');
+        filtrarTabla();
+    }
+
+    function filtrarTabla() {
+        const query = document.getElementById('inputBusqueda').value.toLowerCase().trim();
+        const depto = document.getElementById('filtroDepto').value;
+        const filas = document.querySelectorAll('.fila-trabajador');
+
+        filas.forEach(fila => {
+            const estado = fila.getAttribute('data-estado');
+            const deptoFila = fila.getAttribute('data-depto');
+            const texto = fila.innerText.toLowerCase();
+
+            const coincideEstado = (estadoFiltroActivo === 'todos' || estado === estadoFiltroActivo);
+            const coincideDepto = (depto === 'todos' || deptoFila === depto);
+            const coincideBusqueda = (query === '' || texto.includes(query));
+
+            if (coincideEstado && coincideDepto && coincideBusqueda) {
+                fila.style.display = '';
+            } else {
+                fila.style.display = 'none';
+            }
+        });
+        actualizarSeleccion();
+    }
+
+    // Control de selección múltiple
+    function alternarTodos(masterCheck) {
+        const visibleChecks = document.querySelectorAll('.fila-trabajador:not([style*="display: none"]) .check-fila');
+        visibleChecks.forEach(c => c.checked = masterCheck.checked);
+        actualizarSeleccion();
+    }
+
+    function deseleccionarTodos() {
+        document.querySelectorAll('.check-fila').forEach(c => c.checked = false);
+        document.getElementById('checkTodos').checked = false;
+        actualizarSeleccion();
+    }
+
+    function actualizarSeleccion() {
+        const seleccionados = Array.from(document.querySelectorAll('.check-fila:checked')).map(c => c.value);
+        const barra = document.getElementById('barraSeleccion');
+        const cant = document.getElementById('cantSeleccionados');
+        const lblBtn = document.getElementById('lblBtnPresente');
+
+        cant.textContent = seleccionados.length;
+        if (seleccionados.length > 0) {
+            barra.classList.remove('d-none');
+            barra.classList.add('d-flex');
+            lblBtn.textContent = `Marcar ${seleccionados.length} Seleccionados`;
+        } else {
+            barra.classList.add('d-none');
+            barra.classList.remove('d-flex');
+            lblBtn.textContent = "Marcar Presentes Masivo ({{ conteos.sin_marcar }})";
+        }
+    }
+
+    // Acción masiva de marcado
+    async function marcarPresentesSeleccionados() {
+        let seleccionados = Array.from(document.querySelectorAll('.check-fila:checked')).map(c => c.value);
+        
+        // Si no hay seleccionados manuales, tomar los que están sin marcar visibles
+        if (seleccionados.length === 0) {
+            const sinMarcar = document.querySelectorAll('.fila-trabajador[data-estado="sin_marcar"]:not([style*="display: none"]) .check-fila');
+            seleccionados = Array.from(sinMarcar).map(c => c.value);
+        }
+
+        if (seleccionados.length === 0) {
+            alert('No hay funcionarios pendientes para marcar como presentes.');
+            return;
+        }
+
+        if (!confirm(`¿Desea registrar la presencia de ${seleccionados.length} funcionario(s) para la fecha seleccionada?`)) {
+            return;
+        }
+
+        try {
+            const res = await fetch("{{ url_for('asistencia.marcar_masivo') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({
+                    fecha: "{{ fecha_activa }}",
+                    trabajador_ids: seleccionados
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert('Error al marcar asistencia: ' + (data.error || 'Desconocido'));
+            }
+        } catch (err) {
+            alert('Error de conexión con el servidor.');
+        }
+    }
+
+    // Gestión del Modal de Novedades
+    function abrirModalNovedad(tipo, trabajadorId = null) {
+        if (tipo === 'reposo') {
+            document.getElementById('tipoReposo').checked = true;
+            cambiarTipoNovedad('reposo');
+        } else {
+            document.getElementById('tipoFalta').checked = true;
+            cambiarTipoNovedad('falta');
+        }
+
+        if (trabajadorId) {
+            document.getElementById('modalTrabajadorSelect').value = trabajadorId;
+        } else {
+            document.getElementById('modalTrabajadorSelect').value = "";
+        }
+
+        modalNovedadBS.show();
+    }
+
+    function cambiarTipoNovedad(tipo) {
+        const campoCert = document.getElementById('campoCertificado');
+        const campoHasta = document.getElementById('campoHasta');
+        const lblDesde = document.getElementById('lblDesde');
+        const titulo = document.getElementById('modalTitulo');
+
+        if (tipo === 'reposo') {
+            titulo.textContent = 'Registrar Reposo Médico (IVSS)';
+            campoCert.style.display = 'block';
+            campoHasta.style.display = 'block';
+            lblDesde.textContent = 'Desde:';
+        } else {
+            titulo.textContent = 'Registrar Inasistencia Injustificada';
+            campoCert.style.display = 'none';
+            campoHasta.style.display = 'none';
+            lblDesde.textContent = 'Fecha de Inasistencia:';
+        }
+    }
+</script>
+{% endblock %}

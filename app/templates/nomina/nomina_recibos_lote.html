@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Recibos Oficiales en Lote - Periodo #{{ periodo.periodo_id }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tabler.min.css') }}">
+    <style>
+        body { background-color: #f4f6f9; color: #000; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        .barra-control { position: sticky; top: 0; z-index: 999; background: #ffffff; border-bottom: 2px solid #e2e8f0; padding: 12px 24px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .hoja-recibo { background: #ffffff; width: 210mm; min-height: 140mm; margin: 20px auto; padding: 25px; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); border: 1px solid #cbd5e1; }
+        @media print {
+            .d-print-none, .barra-control { display: none !important; }
+            body { background: #ffffff !important; margin: 0; padding: 0; }
+            .hoja-recibo { width: 100% !important; margin: 0 !important; padding: 15mm !important; border: none !important; box-shadow: none !important; page-break-after: always; break-after: page; }
+            table { font-size: 11px !important; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Barra de Control Flotante -->
+<div class="barra-control d-print-none d-flex justify-content-between align-items-center">
+    <div>
+        <h4 class="mb-0 fw-bold text-dark">Emisión Masiva de Recibos de Pago (LOTTT Art. 106)</h4>
+        <span class="text-muted small">Periodo #{{ periodo.periodo_id }}: {{ periodo.descripcion }} · Total: {{ trabajadores|length }} funcionarios</span>
+    </div>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-secondary" onclick="window.close()">Cerrar Pestaña</button>
+        <button type="button" class="btn btn-dark fw-bold d-inline-flex align-items-center gap-1" onclick="window.print()">
+            <span>🖨️</span> Imprimir Todo el Lote (1 Funcionario por Página)
+        </button>
+    </div>
+</div>
+
+<!-- Iteración de todos los trabajadores del periodo -->
+{% for r in trabajadores %}
+<div class="hoja-recibo">
+    <!-- Membrete Concejo Municipal -->
+    <div class="border-bottom pb-2 mb-3">
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                <h4 class="fw-bold mb-0 text-dark" style="letter-spacing: 0.5px;">CONCEJO MUNICIPAL DE INDEPENDENCIA</h4>
+                <div class="text-muted small" style="font-size: 10px;">ESTADO YARACUY · RIF G-20006055-7 · DIRECCIÓN DE TALENTO HUMANO</div>
+            </div>
+            <div class="text-end">
+                <span class="badge bg-light text-dark border font-monospace" style="font-size: 11px;">COMPROBANTE QUINCENAL</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Encabezado de la Quincena y Datos del Trabajador -->
+    <table class="table table-sm table-bordered mb-2 align-middle" style="font-size: 11px;">
+        <tbody>
+            <tr class="table-light">
+                <td colspan="4" class="fw-bold text-uppercase py-1 text-primary">
+                    PERIODO: {{ periodo.descripcion|upper }} ({{ periodo.fecha_inicio }} AL {{ periodo.fecha_fin }})
+                </td>
+            </tr>
+            <tr>
+                <td style="width: 15%;" class="fw-bold text-muted bg-light">TRABAJADOR:</td>
+                <td style="width: 45%;" class="fw-bold text-dark font-monospace">V-{{ r.cedula }} {{ r.nombres }} {{ r.apellidos }}</td>
+                <td style="width: 20%;" class="fw-bold text-muted bg-light">FECHA INGRESO:</td>
+                <td style="width: 20%;" class="text-dark">{{ r.fecha_ingreso or 'No registrada' }}</td>
+            </tr>
+            <tr>
+                <td class="fw-bold text-muted bg-light">CARGO:</td>
+                <td class="text-dark fw-bold text-uppercase">{{ r.cargo_nombre }}</td>
+                <td class="fw-bold text-muted bg-light">SUELDO MENSUAL:</td>
+                <td class="text-dark font-monospace fw-bold">Bs. {{ "{:,.2f}".format((r.sueldo_base|float * 2) if r.sueldo_base else 316.00) }}</td>
+            </tr>
+            <tr>
+                <td class="fw-bold text-muted bg-light">DEPARTAMENTO:</td>
+                <td class="text-muted small">{{ r.departamento_nombre or 'Concejo Municipal de Independencia' }}</td>
+                <td class="fw-bold text-muted bg-light">CUENTA NÓMINA:</td>
+                <td class="font-monospace small">{{ r.numero_cuenta or '00000000000000000000' }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Tabla de Conceptos (Formato AMINA DALU) -->
+    <table class="table table-sm table-bordered mb-2" style="font-size: 11px;">
+        <thead class="table-light text-center small text-uppercase fw-bold">
+            <tr>
+                <th style="width: 45%;" class="text-start ps-3">Descripción Concepto</th>
+                <th style="width: 10%;">Cant / %</th>
+                <th style="width: 15%;" class="text-end pe-3">Asignaciones</th>
+                <th style="width: 15%;" class="text-end pe-3">Deducciones</th>
+                <th style="width: 15%;" class="text-end pe-3">Neto</th>
+            </tr>
+        </thead>
+        <tbody class="font-monospace small">
+            <tr>
+                <td class="ps-3 text-dark fw-bold">DIAS TRABAJADOS (SUELDO BASE)</td>
+                <td class="text-center text-muted">15</td>
+                <td class="text-end pe-3 text-dark">{{ "{:,.2f}".format(r.sueldo_base|float if r.sueldo_base else 158.00) }}</td>
+                <td class="text-end pe-3 text-muted">—</td>
+                <td class="text-end pe-3 text-muted">—</td>
+            </tr>
+
+            {% for a in r.asignaciones %}
+            <tr>
+                <td class="ps-3 text-dark">{{ a.descripcion|upper }}</td>
+                <td class="text-center text-muted">1</td>
+                <td class="text-end pe-3 text-dark">{{ "{:,.2f}".format(a.monto|float) }}</td>
+                <td class="text-end pe-3 text-muted">—</td>
+                <td class="text-end pe-3 text-muted">—</td>
+            </tr>
+            {% endfor %}
+
+            {% for d in r.deducciones %}
+            <tr>
+                <td class="ps-3 text-danger">{{ d.descripcion|upper }}</td>
+                <td class="text-center text-muted">1</td>
+                <td class="text-end pe-3 text-muted">—</td>
+                <td class="text-end pe-3 text-danger">{{ "{:,.2f}".format(d.monto|float) }}</td>
+                <td class="text-end pe-3 text-muted">—</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot class="table-light font-monospace fw-bold">
+            <tr>
+                <td colspan="2" class="text-end pe-3">TOTALES:</td>
+                <td class="text-end pe-3 text-dark">Bs. {{ "{:,.2f}".format(r.total_asignaciones|float) }}</td>
+                <td class="text-end pe-3 text-danger">Bs. {{ "{:,.2f}".format(r.total_deducciones|float) }}</td>
+                <td class="text-end pe-3 text-success fs-4 bg-light">Bs. {{ "{:,.2f}".format(r.neto_pagar|float) }}</td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <!-- Firmas Oficiales -->
+    <div class="row text-center mt-4 pt-3">
+        <div class="col-6">
+            <div class="border-top border-dark mx-5 pt-1">
+                <div class="fw-bold text-dark small text-uppercase">ELABORADO POR</div>
+                <div class="text-muted" style="font-size: 10px;">Dirección de Recursos Humanos / Nómina</div>
+            </div>
+        </div>
+        <div class="col-6">
+            <div class="border-top border-dark mx-5 pt-1">
+                <div class="fw-bold text-dark small text-uppercase">RECIBIDO CONFORME</div>
+                <div class="text-dark small">{{ r.nombres }} {{ r.apellidos }} (V-{{ r.cedula }})</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+</body>
+</html>

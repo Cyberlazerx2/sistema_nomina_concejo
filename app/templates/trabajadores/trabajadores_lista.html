@@ -1,103 +1,222 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Plantilla de Personal - Concejo Municipal</title>
-    <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
-        h2 { color: #2c3e50; margin-top: 0; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        th { background-color: #2c3e50; color: white; }
-        .btn { padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: bold; display: inline-block; cursor: pointer; border: none; }
-        .btn-primary { background: #0056b3; color: white; }
-        .btn-success { background: #27ae60; color: white; }
-        .btn-warning { background: #e67e22; color: white; }
-        .btn-danger { background: #c0392b; color: white; }
-        .btn-secondary { background: #6c757d; color: white; }
-        .badge-user { background: #2980b9; color: white; padding: 3px 6px; border-radius: 3px; font-size: 11px; }
-        .badge-nouser { background: #95a5a6; color: white; padding: 3px 6px; border-radius: 3px; font-size: 11px; }
-        .alert { padding: 10px; border-radius: 4px; margin-bottom: 15px; font-size: 13px; }
-        .alert-success { background-color: #d4edda; color: #155724; }
-        .alert-warning { background-color: #fff3cd; color: #856404; }
-        .alert-danger { background-color: #f8d7da; color: #721c24; }
-        .alert-info { background-color: #d1ecf1; color: #0c5460; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-            <h2>Expedientes del Talento Humano</h2>
-            <div>
-                {% if session.rol in ['directora_rrhh', 'tecnico_informatica'] %}
-                    <a href="{{ url_for('trabajadores.nuevo') }}" class="btn btn-success">+ Nuevo Trabajador</a>
-                {% endif %}
-                <a href="{{ url_for('auth.dashboard') }}" class="btn btn-secondary">Regresar al Panel</a>
+{% extends "base.html" %}
+
+{% block title %}Directorio General de Funcionarios - RRHH{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none mb-4">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="text-muted small text-uppercase fw-bold">Dirección de Talento Humano</div>
+            <h2 class="page-title text-dark">
+                Directorio General de Funcionarios
+            </h2>
+            <div class="text-muted mt-1">
+                Concejo Municipal de Independencia · Padrón nominal de empleados, obreros y directivos activos.
             </div>
         </div>
-
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }}">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-
-        <div class="card">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Cédula</th>
-                        <th>Funcionario</th>
-                        <th>Cargo / Tipo</th>
-                        <th>Sueldo Base</th>
-                        <th>Carga / Nivel</th>
-                        <th>Cuenta Bancaria</th>
-                        <th>Acceso</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for t in trabajadores %}
-                    <tr>
-                        <td><strong>{{ t.cedula }}</strong></td>
-                        <td>{{ t.nombres }} {{ t.apellidos }}</td>
-                        <td>{{ t.cargo_nombre }}<br><small style="color: #7f8c8d;">{{ t.tipo_personal }}</small></td>
-                        <td style="font-weight: bold; color: #27ae60;">Bs. {{ t.sueldo_base }}</td>
-                        <td>{{ t.hijos }} hijos<br><small>{{ t.nivel_instruccion }}</small></td>
-                        <td style="font-family: monospace; font-size: 11px;">{{ t.banco }}<br>{{ t.numero_cuenta }}</td>
-                        <td>
-                            {% if t.cuenta_usuario_id %}
-                                <span class="badge-user">Usuario: {{ t.nombre_usuario }}</span>
-                            {% else %}
-                                <span class="badge-nouser">Sin cuenta</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if session.rol in ['directora_rrhh', 'tecnico_informatica'] %}
-                                <a href="{{ url_for('trabajadores.editar', id=t.trabajador_id) }}" class="btn btn-warning">Editar</a>
-                                {% if not t.cuenta_usuario_id %}
-                                    <a href="{{ url_for('trabajadores.crear_usuario', id=t.trabajador_id) }}" class="btn btn-primary">+ Usuario</a>
-                                {% endif %}
-                                <form method="POST" action="{{ url_for('trabajadores.desactivar', id=t.trabajador_id) }}" style="display: inline;" onsubmit="return confirm('¿Confirma dar de baja a este trabajador? Pasará a inactivo con fecha de egreso hoy.');">
-                                    <button type="submit" class="btn btn-danger">Baja</button>
-                                </form>
-                            {% else %}
-                                <span style="color: #95a5a6; font-size: 11px;">Solo Lectura</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="8" style="text-align: center; color: #7f8c8d;">No hay trabajadores activos registrados en la institución.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div class="col-auto ms-auto d-flex gap-2">
+            <a href="{{ url_for('trabajadores.solicitudes') }}" class="btn btn-outline-warning d-inline-flex align-items-center gap-1">
+                <span>📋</span> Solicitudes Pendientes
+            </a>
+            <a href="{{ url_for('trabajadores.constancias_admin') }}" class="btn btn-outline-info d-inline-flex align-items-center gap-1">
+                <span>📜</span> Constancias de Trabajo
+            </a>
+            <a href="{{ url_for('trabajadores.nuevo') }}" class="btn btn-primary d-inline-flex align-items-center gap-1">
+                <span>➕</span> Nuevo Ingreso
+            </a>
         </div>
     </div>
-</body>
-</html>
+</div>
+
+<!-- Tarjetas Resumen de Plantilla -->
+<div class="row row-cards mb-4">
+    <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <span class="avatar bg-blue-lt me-3">👥</span>
+                    <div>
+                        <div class="text-muted small text-uppercase fw-bold">Total Plantilla</div>
+                        <div class="fs-2 fw-bold text-dark">{{ trabajadores|length }} Activos</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <span class="avatar bg-green-lt me-3">🏛️</span>
+                    <div>
+                        <div class="text-muted small text-uppercase fw-bold">Empleados Fijos</div>
+                        <div class="fs-2 fw-bold text-success">
+                            {{ trabajadores|selectattr('tipo_personal', 'equalto', 'empleado_fijo')|list|length }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <span class="avatar bg-yellow-lt me-3">🔨</span>
+                    <div>
+                        <div class="text-muted small text-uppercase fw-bold">Obreros Fijos</div>
+                        <div class="fs-2 fw-bold text-warning">
+                            {{ trabajadores|selectattr('tipo_personal', 'equalto', 'obrero_fijo')|list|length }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <span class="avatar bg-purple-lt me-3">⭐</span>
+                    <div>
+                        <div class="text-muted small text-uppercase fw-bold">Alto Nivel / Contrato</div>
+                        <div class="fs-2 fw-bold text-purple">
+                            {{ trabajadores|rejectattr('tipo_personal', 'in', ['empleado_fijo', 'obrero_fijo'])|list|length }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabla del Personal con Búsqueda y Píldoras de Filtro -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-light py-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <!-- Píldoras de tipo de nómina -->
+        <div class="btn-group btn-group-sm" role="group">
+            <button type="button" class="btn btn-outline-primary active" onclick="filtrarTipo('todos', this)">Todos</button>
+            <button type="button" class="btn btn-outline-primary" onclick="filtrarTipo('empleado_fijo', this)">Emp. Fijos</button>
+            <button type="button" class="btn btn-outline-primary" onclick="filtrarTipo('obrero_fijo', this)">Obreros</button>
+            <button type="button" class="btn btn-outline-primary" onclick="filtrarTipo('alto_nivel', this)">Alto Nivel</button>
+            <button type="button" class="btn btn-outline-primary" onclick="filtrarTipo('contratado', this)">Contratados</button>
+        </div>
+
+        <div class="input-icon">
+            <input type="text" id="busquedaTrabajador" class="form-control form-control-sm" placeholder="Buscar por cédula o nombre..." onkeyup="filtrarTablaTrabajadores()" style="width: 250px;">
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-hover" id="tablaTrabajadores">
+            <thead>
+                <tr>
+                    <th>Funcionario</th>
+                    <th>Cédula</th>
+                    <th>Cargo Nominal</th>
+                    <th>Departamento</th>
+                    <th>Nómina</th>
+                    <th>Contacto</th>
+                    <th class="w-1 text-center">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in trabajadores %}
+                <tr class="fila-trabajador" data-tipo="{{ t.tipo_personal }}">
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <span class="avatar avatar-sm bg-dark text-white rounded-circle me-2 fw-bold">
+                                {{ (t.nombres[:1] + t.apellidos[:1])|upper }}
+                            </span>
+                            <div>
+                                <div class="fw-bold text-dark">{{ t.nombres }} {{ t.apellidos }}</div>
+                                <div class="text-muted small">Ingreso: {{ t.fecha_ingreso or 'S/F' }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="font-monospace fw-bold text-muted">
+                        V-{{ t.cedula }}
+                    </td>
+                    <td>
+                        <span class="fw-semibold text-dark">{{ t.cargo_nombre }}</span>
+                    </td>
+                    <td>
+                        <span class="badge bg-light text-muted border">{{ t.departamento_nombre or 'Sin adscripción' }}</span>
+                    </td>
+                    <td>
+                        <span class="badge bg-secondary-lt text-uppercase" style="font-size: 11px;">
+                            {{ t.tipo_personal|replace('_', ' ') }}
+                        </span>
+                    </td>
+                    <td class="small">
+                        <div class="text-muted">{{ t.telefono or 'Sin teléfono' }}</div>
+                        <div class="text-muted font-monospace" style="font-size: 10px;">{{ t.correo or '' }}</div>
+                    </td>
+                    <td class="text-center">
+                        <div class="btn-group">
+                            <a href="{{ url_for('trabajadores.editar', id=t.trabajador_id) }}" class="btn btn-sm btn-outline-secondary" title="Editar Expediente">
+                                ✏️
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">
+                        No hay personal registrado en el sistema.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card-footer d-flex justify-content-between align-items-center py-2 text-muted small">
+        <span>Mostrando <strong id="totalTrabajadoresVisibles">{{ trabajadores|length }}</strong> funcionarios</span>
+        <span>Gestión de Talento Humano</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let tipoFiltro = 'todos';
+
+    function filtrarTipo(tipo, btn) {
+        tipoFiltro = tipo;
+        btn.parentElement.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        filtrarTablaTrabajadores();
+    }
+
+    function filtrarTablaTrabajadores() {
+        const query = document.getElementById('busquedaTrabajador').value.toLowerCase().trim();
+        const filas = document.querySelectorAll('.fila-trabajador');
+        let visibles = 0;
+
+        filas.forEach(fila => {
+            const tipoFila = fila.getAttribute('data-tipo');
+            const texto = fila.innerText.toLowerCase();
+
+            let coincideTipo = false;
+            if (tipoFiltro === 'todos') {
+                coincideTipo = true;
+            } else if (tipoFiltro === 'contratado') {
+                coincideTipo = tipoFila.includes('contratado');
+            } else {
+                coincideTipo = (tipoFila === tipoFiltro);
+            }
+
+            const coincideBusqueda = (query === '' || texto.includes(query));
+
+            if (coincideTipo && coincideBusqueda) {
+                fila.style.display = '';
+                visibles++;
+            } else {
+                fila.style.display = 'none';
+            }
+        });
+        document.getElementById('totalTrabajadoresVisibles').textContent = visibles;
+    }
+</script>
+{% endblock %}

@@ -1,141 +1,163 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Mi Perfil Laboral - Concejo Municipal</title>
-    <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
-        .container { max-width: 900px; margin: 0 auto; }
-        .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); margin-bottom: 20px; }
-        h2, h3 { color: #2c3e50; margin-top: 0; }
-        .grid-readonly { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 13px; background: #fafafa; padding: 15px; border-radius: 4px; border: 1px solid #eee; margin-bottom: 20px; }
-        .grid-readonly div span { font-weight: bold; color: #2c3e50; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 13px; color: #333; }
-        input { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        .btn { padding: 9px 16px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-block; }
-        .btn-success { background: #27ae60; color: white; }
-        .btn-secondary { background: #6c757d; color: white; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 12px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #2c3e50; color: white; }
-        .badge { padding: 3px 6px; border-radius: 3px; font-size: 10px; font-weight: bold; color: white; text-transform: uppercase; }
-        .badge-pendiente { background: #f39c12; }
-        .badge-aprobada { background: #27ae60; }
-        .badge-rechazada { background: #c0392b; }
-        .alert { padding: 10px; border-radius: 4px; margin-bottom: 15px; font-size: 13px; }
-        .alert-success { background-color: #d4edda; color: #155724; }
-        .alert-info { background-color: #d1ecf1; color: #0c5460; }
-        .alert-warning { background-color: #fff3cd; color: #856404; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-            <h2>Ficha Personal y Autoservicio</h2>
-            <div>
-                <a href="{{ url_for('portal.recibos') }}" class="btn btn-secondary" style="background: #0056b3;">Mis Recibos</a>
-                <a href="{{ url_for('auth.dashboard') }}" class="btn btn-secondary">Regresar al Panel</a>
+{% extends "base.html" %}
+
+{% block title %}Mi Ficha de Perfil - Concejo Municipal{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none mb-4">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="text-muted small text-uppercase fw-bold">Autoservicio del Funcionario</div>
+            <h2 class="page-title text-dark">
+                Mi Expediente y Datos de Contacto
+            </h2>
+            <div class="text-muted mt-1">
+                Consulta de ficha laboral institucional y canal formal para actualización de datos residenciales y telefónicos.
             </div>
         </div>
+        <div class="col-auto ms-auto d-flex gap-2">
+            <a href="{{ url_for('portal.inicio') }}" class="btn btn-outline-secondary">
+                ← Volver al Portal
+            </a>
+        </div>
+    </div>
+</div>
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }}">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-
-        <!-- Expediente Institucional -->
-        <div class="card">
-            <h3>Expediente Institucional (Solo Lectura)</h3>
-            <div class="grid-readonly">
-                <div><span>Cédula:</span> {{ trabajador.cedula }}</div>
-                <div><span>Funcionario:</span> {{ trabajador.nombres }} {{ trabajador.apellidos }}</div>
-                <div><span>Cargo:</span> {{ trabajador.cargo_nombre }}</div>
-                <div><span>Dependencia:</span> {{ trabajador.departamento_nombre }}</div>
-                <div><span>Tipo de Nómina:</span> {{ trabajador.tipo_personal }}</div>
-                <div><span>Fecha de Ingreso:</span> {{ trabajador.fecha_ingreso }}</div>
-                <div><span>Carga Familiar:</span> {{ trabajador.hijos }} hijo(s)</div>
-                <div><span>Instrucción:</span> {{ trabajador.nivel_instruccion }}</div>
-                <div><span>Entidad Bancaria:</span> {{ trabajador.banco }}</div>
-                <div><span>Cuenta Nómina:</span> {{ trabajador.numero_cuenta }}</div>
+<div class="row g-4">
+    <!-- Columna Izquierda: Ficha Laboral Oficial (Solo Lectura) -->
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm mb-4" style="border-radius: 10px;">
+            <div class="card-header bg-dark text-white py-3">
+                <h3 class="card-title text-white mb-0">🏛️ Expediente Institucional Oficial</h3>
             </div>
-
-            <!-- Formulario de Modificación de Datos de Contacto -->
-            <h3>Solicitud de Actualización de Datos de Contacto</h3>
-            <p style="font-size: 12px; color: #666;">
-                * Modifique únicamente el dato de contacto que requiera actualizar. La solicitud será evaluada por la Dirección de Recursos Humanos.
-            </p>
-
-            <form method="POST">
-                <div style="display: flex; gap: 15px;">
-                    <div class="form-group" style="flex: 1;">
-                        <label>Teléfono de Contacto:</label>
-                        <input type="text" name="telefono" value="{{ trabajador.telefono or '' }}" placeholder="0412-0000000">
-                    </div>
-                    <div class="form-group" style="flex: 1;">
-                        <label>Correo Electrónico:</label>
-                        <input type="email" name="correo" value="{{ trabajador.correo or '' }}" placeholder="usuario@correo.com">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3 pb-3 border-bottom">
+                    <span class="avatar avatar-lg bg-blue-lt text-primary fw-bold fs-2 rounded-circle me-3">
+                        {{ (trabajador.nombres[:1] + trabajador.apellidos[:1])|upper if trabajador.nombres and trabajador.apellidos else 'TR' }}
+                    </span>
+                    <div>
+                        <div class="fw-bold fs-3 text-dark">{{ trabajador.nombres }} {{ trabajador.apellidos }}</div>
+                        <div class="text-muted font-monospace small">C.I. V-{{ trabajador.cedula }}</div>
+                        <span class="badge bg-green-lt text-uppercase mt-1">Personal Activo</span>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label>Dirección de Habitación:</label>
-                    <input type="text" name="direccion" value="{{ trabajador.direccion or '' }}" placeholder="Indique residencia actual">
+                <div class="small">
+                    <div class="row py-2 border-bottom">
+                        <span class="col-5 text-muted fw-bold">Cargo Nominal:</span>
+                        <span class="col-7 text-dark fw-semibold">{{ trabajador.cargo_nombre }}</span>
+                    </div>
+                    <div class="row py-2 border-bottom">
+                        <span class="col-5 text-muted fw-bold">Departamento:</span>
+                        <span class="col-7 text-dark">{{ trabajador.departamento_nombre or 'Concejo Municipal' }}</span>
+                    </div>
+                    <div class="row py-2 border-bottom">
+                        <span class="col-5 text-muted fw-bold">Fecha de Ingreso:</span>
+                        <span class="col-7 text-dark">{{ trabajador.fecha_ingreso or 'No registrada' }}</span>
+                    </div>
+                    <div class="row py-2 border-bottom">
+                        <span class="col-5 text-muted fw-bold">Entidad Bancaria:</span>
+                        <span class="col-7 text-dark">{{ trabajador.banco or 'Pago Centralizado' }}</span>
+                    </div>
+                    <div class="row py-2">
+                        <span class="col-5 text-muted fw-bold">Cuenta Nómina:</span>
+                        <span class="col-7 font-monospace text-dark text-truncate">{{ trabajador.numero_cuenta or '00000000000000000000' }}</span>
+                    </div>
                 </div>
 
-                <button type="submit" class="btn btn-success">Enviar Solicitud a RRHH</button>
+                <div class="alert alert-info mt-3 mb-0 py-2 small" role="alert">
+                    🔒 <strong>Seguridad Laboral:</strong> Modificaciones de cargo, sueldo o cuenta bancaria deben ser tramitadas formalmente ante la taquilla de Talento Humano con sus recaudos.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Columna Derecha: Formulario de Contacto e Historial de Solicitudes -->
+    <div class="col-lg-7">
+        <!-- Formulario de Solicitud de Modificación -->
+        <div class="card border-0 shadow-sm mb-4" style="border-radius: 10px;">
+            <div class="card-header bg-light py-3">
+                <h3 class="card-title text-dark mb-0">✏️ Actualización de Datos de Contacto</h3>
+            </div>
+            <form method="POST" action="{{ url_for('portal.perfil') }}" class="card-body">
+                <p class="text-muted small mb-3">
+                    Modifique los campos requeridos. Al guardar, se enviará una solicitud de validación a la Dirección de Recursos Humanos.
+                </p>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Teléfono Móvil / WhatsApp:</label>
+                    <input type="tel" name="telefono" class="form-control" value="{{ trabajador.telefono or '' }}" placeholder="Ej: 0414-1234567" required>
+                    <small class="text-muted">Utilizado para convocatorias institucionales y avisos quincenales.</small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Correo Electrónico:</label>
+                    <input type="email" name="correo" class="form-control" value="{{ trabajador.correo or '' }}" placeholder="Ej: funcionario@gmail.com" required>
+                    <small class="text-muted">Canal para la remisión de comprobantes digitales de pago.</small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Dirección de Habitación:</label>
+                    <textarea name="direccion" rows="2" class="form-control" placeholder="Indique municipio, sector, calle y número de casa...">{{ trabajador.direccion or '' }}</textarea>
+                </div>
+
+                <div class="d-flex justify-content-end">
+                    <button type="submit" class="btn btn-primary d-inline-flex align-items-center gap-1">
+                        <span>📤</span> Remitir Solicitud a RRHH
+                    </button>
+                </div>
             </form>
         </div>
 
-        <!-- Historial de Solicitudes -->
-        <div class="card">
-            <h3>Historial de Solicitudes Emitidas</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>N°</th>
-                        <th>Fecha</th>
-                        <th>Dato</th>
-                        <th>Valor Anterior</th>
-                        <th>Valor Solicitado</th>
-                        <th>Estado</th>
-                        <th>Observación / Respuesta</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for s in solicitudes %}
-                    <tr>
-                        <td>#{{ s.solicitud_id }}</td>
-                        <td>{{ s.fecha_solicitud }}</td>
-                        <td><strong>{{ s.campo|capitalize }}</strong></td>
-                        <td style="color: #7f8c8d;">{{ s.valor_actual or '(Vacío)' }}</td>
-                        <td style="color: #27ae60; font-weight: bold;">{{ s.valor_nuevo }}</td>
-                        <td>
-                            <span class="badge badge-{{ s.estado }}">{{ s.estado }}</span>
-                        </td>
-                        <td style="font-size: 11px; color: #555;">
-                            {% if s.estado == 'rechazada' %}
-                                <span style="color: #c0392b;">{{ s.motivo_rechazo or 'Sin observaciones' }}</span>
-                            {% elif s.estado == 'aprobada' %}
-                                <span style="color: #27ae60;">Aprobado el {{ s.fecha_respuesta }}</span>
-                            {% else %}
-                                <span>En espera de revisión</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="7" style="text-align: center; color: #7f8c8d; padding: 15px;">
-                            No ha emitido solicitudes de cambio de datos.
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <!-- Historial y Estatus de Solicitudes -->
+        <div class="card border-0 shadow-sm" style="border-radius: 10px;">
+            <div class="card-header bg-light py-3">
+                <h3 class="card-title text-dark mb-0">📋 Estatus de Solicitudes Tramitadas</h3>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table table-striped table-sm">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Dato Modificado</th>
+                            <th>Nuevo Valor Remitido</th>
+                            <th>Estatus</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in solicitudes %}
+                        <tr>
+                            <td class="font-monospace small text-muted">
+                                {{ s.fecha_solicitud.strftime('%d/%m/%Y') if s.fecha_solicitud.strftime is defined else s.fecha_solicitud }}
+                            </td>
+                            <td class="fw-bold text-dark text-capitalize small">
+                                {{ s.campo }}
+                            </td>
+                            <td class="small text-truncate" style="max-width: 180px;" title="{{ s.valor_nuevo }}">
+                                {{ s.valor_nuevo }}
+                            </td>
+                            <td>
+                                {% if s.estado == 'pendiente' %}
+                                    <span class="badge bg-warning-lt text-uppercase"><span class="badge-dot bg-warning me-1"></span>Pendiente</span>
+                                {% elif s.estado == 'aprobada' %}
+                                    <span class="badge bg-success-lt text-uppercase"><span class="badge-dot bg-success me-1"></span>Aplicado</span>
+                                {% elif s.estado == 'rechazada' %}
+                                    <span class="badge bg-danger-lt text-uppercase" title="{{ s.motivo_rechazo or '' }}"><span class="badge-dot bg-danger me-1"></span>Rechazado</span>
+                                {% else %}
+                                    <span class="badge bg-secondary-lt text-uppercase">{{ s.estado }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-3 small">
+                                No tiene solicitudes de actualización pendientes ni registradas.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
-</body>
-</html>
+</div>
+{% endblock %}

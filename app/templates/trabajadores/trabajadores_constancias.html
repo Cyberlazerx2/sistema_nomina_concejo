@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}Bandeja de Constancias de Trabajo - RRHH{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none mb-4">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="text-muted small text-uppercase fw-bold">Dirección de Talento Humano</div>
+            <h2 class="page-title text-dark">
+                Bandeja de Constancias de Trabajo
+            </h2>
+            <div class="text-muted mt-1">
+                Concejo Municipal de Independencia · Emisión, certificación y asignación de correlativo oficial.
+            </div>
+        </div>
+        <div class="col-auto ms-auto d-flex gap-2">
+            <a href="{{ url_for('trabajadores.listar') }}" class="btn btn-outline-secondary">
+                ← Volver al Directorio
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- 1. SOLICITUDES PENDIENTES -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-warning-lt py-3 d-flex justify-content-between align-items-center">
+        <h3 class="card-title text-dark mb-0 fw-bold">
+            ⏳ Solicitudes de Constancia por Emitir
+        </h3>
+        <span class="badge bg-warning text-dark font-monospace fs-5">{{ pendientes|length }} pendiente(s)</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-hover">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Funcionario</th>
+                    <th>Cargo</th>
+                    <th>Modalidad</th>
+                    <th>Destinatario</th>
+                    <th class="w-1 text-center">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in pendientes %}
+                <tr>
+                    <td class="font-monospace small text-muted">
+                        {{ p.fecha_solicitud.strftime('%d/%m/%Y %H:%M') if p.fecha_solicitud and p.fecha_solicitud.strftime is defined else p.fecha_solicitud }}
+                    </td>
+                    <td>
+                        <div class="fw-bold text-dark">{{ p.nombres }} {{ p.apellidos }}</div>
+                        <div class="font-monospace small text-muted">C.I. V-{{ p.cedula }}</div>
+                    </td>
+                    <td class="small">{{ p.cargo_nombre }}</td>
+                    <td>
+                        {% if p.tipo == 'con_sueldo' %}
+                            <span class="badge bg-green-lt fw-bold">Con Sueldo</span>
+                        {% else %}
+                            <span class="badge bg-secondary-lt fw-bold">Sin Sueldo</span>
+                        {% endif %}
+                    </td>
+                    <td class="fw-semibold text-dark">{{ p.destinatario }}</td>
+                    <td class="text-center">
+                        <div class="d-flex gap-1 justify-content-center">
+                            <!-- Emitir -->
+                            <form method="POST" action="{{ url_for('trabajadores.procesar_constancia', constancia_id=p.constancia_id) }}">
+                                <input type="hidden" name="accion" value="emitir">
+                                <button type="submit" class="btn btn-sm btn-success fw-bold" onclick="return confirm('¿Aprobar y certificar la emisión de esta constancia?');">
+                                    ✓ Emitir
+                                </button>
+                            </form>
+                            <!-- Rechazar -->
+                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalRechazar{{ p.constancia_id }}">
+                                ✕
+                            </button>
+                        </div>
+
+                        <!-- Modal Rechazar -->
+                        <div class="modal fade" id="modalRechazar{{ p.constancia_id }}" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered">
+                                <form method="POST" action="{{ url_for('trabajadores.procesar_constancia', constancia_id=p.constancia_id) }}" class="modal-content text-start">
+                                    <input type="hidden" name="accion" value="rechazar">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title fw-bold">Rechazar Solicitud #{{ p.constancia_id }}</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <label class="form-label fw-bold">Indique el motivo del rechazo:</label>
+                                        <textarea name="motivo_rechazo" rows="3" class="form-control" placeholder="Ej: Información de destino inconsistente..." required></textarea>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-danger fw-bold">Confirmar Rechazo</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">
+                        🎉 No hay solicitudes pendientes de constancia.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 2. CONSTANCIAS EMITIDAS -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-light py-3">
+        <h3 class="card-title text-muted mb-0">Historial de Constancias Emitidas</h3>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-sm">
+            <thead>
+                <tr>
+                    <th>Correlativo</th>
+                    <th>Funcionario</th>
+                    <th>Modalidad</th>
+                    <th>Destinatario</th>
+                    <th>Fecha Emisión</th>
+                    <th class="w-1 text-center">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in emitidas %}
+                <tr>
+                    <td class="font-monospace fw-bold text-primary">{{ e.correlativo or '—' }}</td>
+                    <td>
+                        <span class="fw-bold text-dark">{{ e.nombres }} {{ e.apellidos }}</span>
+                        <span class="text-muted small font-monospace">(V-{{ e.cedula }})</span>
+                    </td>
+                    <td>{{ 'Con Sueldo' if e.tipo == 'con_sueldo' else 'Sin Sueldo' }}</td>
+                    <td>{{ e.destinatario }}</td>
+                    <td class="text-muted small">
+                        {{ e.fecha_emision.strftime('%d/%m/%Y') if e.fecha_emision and e.fecha_emision.strftime is defined else e.fecha_emision }}
+                    </td>
+                    <td class="text-center">
+                        {% if e.estado == 'emitida' %}
+                        <a href="{{ url_for('portal.imprimir_constancia', constancia_id=e.constancia_id) }}" target="_blank" class="btn btn-sm btn-outline-dark">
+                            📄 Ver
+                        </a>
+                        {% else %}
+                        <span class="badge bg-danger-lt">Rechazada</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-3 small">No hay constancias emitidas registradas.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

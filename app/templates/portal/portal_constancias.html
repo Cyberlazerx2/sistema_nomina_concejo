@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}Mis Constancias de Trabajo - Portal del Funcionario{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none mb-4">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="text-muted small text-uppercase fw-bold">Autoservicio del Funcionario</div>
+            <h2 class="page-title text-dark">
+                Constancias de Trabajo
+            </h2>
+            <div class="text-muted mt-1">
+                Solicitud y descarga de constancias laborales certificadas con correlativo oficial.
+            </div>
+        </div>
+        <div class="col-auto ms-auto d-flex gap-2">
+            <a href="{{ url_for('portal.inicio') }}" class="btn btn-outline-secondary">
+                ← Volver al Portal
+            </a>
+            <button type="button" class="btn btn-primary d-inline-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#modalNuevaConstancia">
+                <span>➕</span> Solicitar Constancia
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-light py-3 d-flex justify-content-between align-items-center">
+        <h3 class="card-title text-dark mb-0">Historial de Constancias Solicitadas</h3>
+        <span class="badge bg-blue-lt">{{ constancias|length }} trámites</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-hover">
+            <thead>
+                <tr>
+                    <th>Fecha Solicitud</th>
+                    <th>Modalidad</th>
+                    <th>Dirigida a</th>
+                    <th>Correlativo Oficial</th>
+                    <th class="text-center">Estatus</th>
+                    <th class="w-1 text-center">Documento</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in constancias %}
+                <tr>
+                    <td class="font-monospace small text-muted">
+                        {{ c.fecha_solicitud.strftime('%d/%m/%Y %H:%M') if c.fecha_solicitud and c.fecha_solicitud.strftime is defined else c.fecha_solicitud }}
+                    </td>
+                    <td>
+                        {% if c.tipo == 'con_sueldo' %}
+                            <span class="badge bg-green-lt fw-bold">Con Sueldo Devengado</span>
+                        {% else %}
+                            <span class="badge bg-secondary-lt fw-bold">Sin Montos Salariales</span>
+                        {% endif %}
+                    </td>
+                    <td class="fw-semibold text-dark">{{ c.destinatario }}</td>
+                    <td class="font-monospace fw-bold text-primary">
+                        {{ c.correlativo or 'En proceso' }}
+                    </td>
+                    <td class="text-center">
+                        {% if c.estado == 'pendiente' %}
+                            <span class="badge bg-warning-lt text-uppercase"><span class="badge-dot bg-warning me-1"></span>En Revisión</span>
+                        {% elif c.estado == 'emitida' %}
+                            <span class="badge bg-success-lt text-uppercase"><span class="badge-dot bg-success me-1"></span>Emitida</span>
+                        {% elif c.estado == 'rechazada' %}
+                            <span class="badge bg-danger-lt text-uppercase" title="{{ c.motivo_rechazo or '' }}"><span class="badge-dot bg-danger me-1"></span>Rechazada</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if c.estado == 'emitida' %}
+                            <a href="{{ url_for('portal.imprimir_constancia', constancia_id=c.constancia_id) }}" target="_blank" class="btn btn-sm btn-dark d-inline-flex align-items-center gap-1">
+                                <span>🖨️</span> Ver / Imprimir
+                            </a>
+                        {% else %}
+                            <button class="btn btn-sm btn-outline-secondary" disabled>No disponible</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">
+                        No has solicitado constancias de trabajo. Puedes generar una nueva solicitud pulsando el botón superior.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Suave: Solicitar Constancia -->
+<div class="modal modal-blur fade" id="modalNuevaConstancia" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="POST" action="{{ url_for('portal.constancias') }}" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">Solicitud de Constancia de Trabajo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Modalidad de la Constancia:</label>
+                    <select name="tipo" class="form-select" required>
+                        <option value="con_sueldo" selected>Con Sueldo Mensual Detallado</option>
+                        <option value="sin_sueldo">Sin Información Salarial (Solo Cargo y Antigüedad)</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Destinatario:</label>
+                    <input type="text" name="destinatario" class="form-control" value="A QUIEN PUEDA INTERESAR" required placeholder="Ej: Banco de Venezuela, Consulado...">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Motivo o Justificación (Opcional):</label>
+                    <textarea name="motivo" rows="2" class="form-control" placeholder="Ej: Trámite de apertura de cuenta nómina..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-primary fw-bold">Remitir a Talento Humano</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

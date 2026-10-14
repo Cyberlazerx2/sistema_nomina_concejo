@@ -1,80 +1,217 @@
 {% extends "base.html" %}
 
-{% block title %}Historial de Periodos de Nómina{% endblock %}
+{% block title %}Historial y Gestión de Nóminas - Concejo Municipal{% endblock %}
 
 {% block content %}
 <div class="page-header d-print-none mb-4">
     <div class="row align-items-center">
         <div class="col">
+            <div class="text-muted small text-uppercase fw-bold">Dirección de Talento Humano</div>
             <h2 class="page-title text-dark">
-                Historial de Nóminas Procesadas
+                Historial y Gestión de Nóminas
             </h2>
             <div class="text-muted mt-1">
-                Consulta de periodos elaborados, ciclo de aprobación de 3 pasos y dispersión al Sistema Patria.
+                Ciclo de validación institucional, emisión de recibos LOTTT Art. 106 y dispersión al Sistema Patria.
             </div>
         </div>
         <div class="col-auto ms-auto d-print-none">
-            {% if session.get('rol') == 'analista_rrhh' %}
-            <a href="{{ url_for('nomina.generar') }}" class="btn btn-primary">
-                + Elaborar Nueva Pre-Nómina
-            </a>
+            <!-- Botón que abre el Modal de Creación en vez de otra pestaña -->
+            {% if session.get('rol') in ['analista_rrhh', 'directora_rrhh'] %}
+            <button type="button" class="btn btn-primary d-inline-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#modalNuevaNomina">
+                <span>➕</span> Elaborar Pre-Nómina
+            </button>
             {% endif %}
         </div>
     </div>
 </div>
 
-<div class="card">
-    <div class="card-header">
-        <h3 class="card-title">Relación de Periodos Registrados</h3>
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-light py-3 d-flex justify-content-between align-items-center">
+        <h3 class="card-title text-dark mb-0">Relación de Periodos Registrados</h3>
+        <span class="badge bg-blue-lt">{{ periodos|length }} emisiones registradas</span>
     </div>
     <div class="table-responsive">
-        <table class="table table-vcenter card-table table-striped">
+        <table class="table table-vcenter card-table table-hover">
             <thead>
                 <tr>
-                    <th>N°</th>
-                    <th>Descripción / Lapso</th>
+                    <th class="w-1">N°</th>
+                    <th>Descripción / Lapso Quincenal</th>
                     <th>Tipo Nómina</th>
                     <th>Periodicidad</th>
-                    <th>Total Neto</th>
-                    <th>Estado de Aprobación</th>
-                    <th class="w-1 text-center">Acción</th>
+                    <th class="text-end">Total Neto Dispersado</th>
+                    <th class="text-center">Estado Institucional</th>
+                    <th class="w-1 text-center">Acciones</th>
                 </tr>
             </thead>
             <tbody>
                 {% for p in periodos %}
                 <tr>
-                    <td class="text-muted fw-bold">#{{ p.periodo_id }}</td>
+                    <td class="font-monospace text-muted fw-bold">#{{ p.periodo_id }}</td>
                     <td>
-                        <div class="fw-bold text-dark">{{ p.descripcion }}</div>
-                        <div class="text-muted small">{{ p.fecha_inicio }} al {{ p.fecha_fin }}</div>
+                        <div class="fw-bold text-dark fs-4">{{ p.descripcion }}</div>
+                        <div class="text-muted small font-monospace">{{ p.fecha_inicio }} al {{ p.fecha_fin }}</div>
                     </td>
                     <td>
-                        <span class="badge bg-secondary-lt text-uppercase">{{ p.tipo_nomina|replace('_', ' ') }}</span>
-                    </td>
-                    <td>{{ p.periodicidad|capitalize }}</td>
-                    <td class="fw-bold text-success fs-4">
-                        Bs. {{ p.total_neto }}
-                    </td>
-                    <td>
-                        <span class="badge badge-{{ p.estado }} text-uppercase">
-                            {{ p.estado|replace('_', ' ') }}
+                        <span class="badge bg-secondary-lt text-uppercase font-monospace" style="font-size: 11px;">
+                            {{ p.tipo_nomina|replace('_', ' ') }}
                         </span>
                     </td>
+                    <td class="text-capitalize small text-muted">{{ p.periodicidad }}</td>
+                    <td class="text-end font-monospace fw-bold text-success fs-3">
+                        Bs. {{ "{:,.2f}".format(p.total_neto|float) if p.total_neto else '0.00' }}
+                    </td>
                     <td class="text-center">
-                        <a href="{{ url_for('nomina.detalle', periodo_id=p.periodo_id) }}" class="btn btn-sm btn-outline-primary">
-                            Inspeccionar
-                        </a>
+                        {% if p.estado == 'borrador' %}
+                            <span class="badge bg-warning-lt text-uppercase"><span class="badge-dot bg-warning me-1"></span>Borrador</span>
+                        {% elif p.estado == 'revisada' %}
+                            <span class="badge bg-info-lt text-uppercase"><span class="badge-dot bg-info me-1"></span>Revisada</span>
+                        {% elif p.estado == 'aprobada' %}
+                            <span class="badge bg-success-lt text-uppercase"><span class="badge-dot bg-success me-1"></span>Aprobada Oficial</span>
+                        {% elif p.estado == 'procesada_patria' %}
+                            <span class="badge bg-purple-lt text-uppercase"><span class="badge-dot bg-purple me-1"></span>Procesada Patria</span>
+                        {% elif p.estado == 'rechazada' %}
+                            <span class="badge bg-danger-lt text-uppercase" title="{{ p.observaciones_rechazo or '' }}"><span class="badge-dot bg-danger me-1"></span>Rechazada</span>
+                        {% else %}
+                            <span class="badge bg-secondary-lt text-uppercase">{{ p.estado }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <div class="d-flex gap-1 justify-content-center">
+                            <!-- Inspeccionar Detalle -->
+                            <a href="{{ url_for('nomina.detalle', periodo_id=p.periodo_id) }}" class="btn btn-sm btn-outline-primary" title="Inspeccionar">
+                                🔍 Ver
+                            </a>
+
+                            <!-- Sábana en Modal -->
+                            <button type="button" class="btn btn-sm btn-outline-secondary" title="Sábana Consolidada" onclick="abrirModalSabana('{{ url_for('nomina.reporte_consolidado', periodo_id=p.periodo_id) }}', 'Periodo #{{ p.periodo_id }}')">
+                                📊 Sábana
+                            </button>
+
+                            <!-- Eliminar Borrador mediante Modal Suave -->
+                            {% if p.estado in ['borrador', 'rechazada'] and session.get('rol') in ['directora_rrhh', 'analista_rrhh'] %}
+                            <button type="button" class="btn btn-sm btn-outline-danger" title="Eliminar Borrador" onclick="confirmarEliminar('{{ url_for('nomina.eliminar', periodo_id=p.periodo_id) }}', 'Periodo #{{ p.periodo_id }} ({{ p.descripcion }})')">
+                                🗑️
+                            </button>
+                            {% endif %}
+                        </div>
                     </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="7" class="text-center text-muted py-4">
-                        No se han generado periodos de nómina en el sistema.
-                    </td>
+                    <td colspan="7" class="text-center text-muted py-4">No se han generado periodos de nómina en el sistema.</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
+
+<!-- ========================================== -->
+<!-- 1. MODAL: ELABORAR PRE-NÓMINA RÁPIDA -->
+<!-- ========================================== -->
+<div class="modal modal-blur fade" id="modalNuevaNomina" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <form method="POST" action="{{ url_for('nomina.generar') }}" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">Elaborar Pre-Nómina Quincenal</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Tipo de Nómina / Padrón:</label>
+                    <select name="tipo_personal" class="form-select" required>
+                        {% for cod, nom in tipos_nomina %}
+                        <option value="{{ cod }}">{{ nom }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label fw-bold">Fecha Inicio:</label>
+                        <input type="date" name="fecha_inicio" class="form-control" required>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold">Fecha Fin:</label>
+                        <input type="date" name="fecha_fin" class="form-control" required>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Descripción del Periodo:</label>
+                    <input type="text" name="descripcion" class="form-control" placeholder="Ej: 1ra Quincena Octubre 2026" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-primary fw-bold">⚙️ Calcular y Generar Borrador</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- 2. MODAL SUAVE: CONFIRMAR ELIMINACIÓN -->
+<!-- ========================================== -->
+<div class="modal modal-blur fade" id="modalConfirmarEliminar" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="modal-status bg-danger"></div>
+            <div class="modal-body text-center py-4">
+                <span class="avatar avatar-xl bg-danger-lt text-danger mb-3">🗑️</span>
+                <h3>¿Confirmar Eliminación?</h3>
+                <div class="text-muted" id="modalEliminarTexto">Esta pre-nómina y sus cálculos preliminares serán eliminados.</div>
+            </div>
+            <div class="modal-footer">
+                <div class="w-100">
+                    <div class="row">
+                        <div class="col"><button type="button" class="btn w-100" data-bs-dismiss="modal">Cancelar</button></div>
+                        <div class="col">
+                            <form id="formEliminarModal" method="POST" action="">
+                                <button type="submit" class="btn btn-danger w-100 fw-bold">Eliminar</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- 3. MODAL: VISOR DE SÁBANA CONSOLIDADA -->
+<!-- ========================================== -->
+<div class="modal modal-blur fade" id="modalSabanaGenerica" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-fullscreen" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="tituloModalSabana">📊 Sábana Consolidada</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <iframe id="iframeSabana" src="" style="width: 100%; height: 100%; border: none;"></iframe>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function confirmarEliminar(urlAction, itemNombre) {
+        document.getElementById('formEliminarModal').action = urlAction;
+        document.getElementById('modalEliminarTexto').innerHTML = '¿Está seguro de eliminar definitivamente <strong>' + itemNombre + '</strong>?';
+        var modal = new bootstrap.Modal(document.getElementById('modalConfirmarEliminar'));
+        modal.show();
+    }
+
+    function abrirModalSabana(urlIframe, titulo) {
+        document.getElementById('tituloModalSabana').textContent = '📊 Sábana Consolidada - ' + titulo;
+        document.getElementById('iframeSabana').src = urlIframe;
+        var modal = new bootstrap.Modal(document.getElementById('modalSabanaGenerica'));
+        modal.show();
+    }
+</script>
 {% endblock %}

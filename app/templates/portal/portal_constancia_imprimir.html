@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Constancia de Trabajo - {{ c.nombres }} {{ c.apellidos }}</title>
+    <style>
+        body {
+            background-color: #f4f6f9;
+            color: #000000;
+            font-family: "Times New Roman", Times, serif;
+            margin: 0;
+            padding: 20px;
+        }
+        .hoja-constancia {
+            background: #ffffff;
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto;
+            padding: 25mm 25mm 20mm 25mm;
+            box-sizing: border-box;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            position: relative;
+        }
+        .membrete {
+            text-align: center;
+            line-height: 1.3;
+            font-size: 13px;
+            font-weight: bold;
+            text-transform: uppercase;
+            border-bottom: 2px solid #000;
+            padding-bottom: 12px;
+            margin-bottom: 25px;
+        }
+        .correlativo {
+            text-align: right;
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 30px;
+            color: #333;
+        }
+        .titulo-doc {
+            text-align: center;
+            font-size: 22px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            margin-bottom: 35px;
+            text-decoration: underline;
+        }
+        .cuerpo-texto {
+            font-size: 15px;
+            line-height: 2.0;
+            text-align: justify;
+            text-indent: 40px;
+            margin-bottom: 25px;
+        }
+        .bloque-firmas {
+            margin-top: 60px;
+            text-align: center;
+        }
+        .linea-firma {
+            width: 250px;
+            border-top: 1px solid #000;
+            margin: 0 auto 8px auto;
+        }
+        .cargo-firmante {
+            font-size: 12px;
+            line-height: 1.3;
+        }
+        .pie-pagina {
+            position: absolute;
+            bottom: 15mm;
+            left: 25mm;
+            right: 25mm;
+            font-family: Arial, sans-serif;
+            font-size: 10px;
+            text-align: center;
+            color: #555;
+            border-top: 1px solid #ccc;
+            padding-top: 8px;
+        }
+        .barra-impresion {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .btn-imprimir {
+            background: #1e293b;
+            color: #ffffff;
+            border: none;
+            padding: 10px 20px;
+            font-size: 14px;
+            font-family: Arial, sans-serif;
+            cursor: pointer;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        @media print {
+            body { background: #ffffff; padding: 0; }
+            .barra-impresion { display: none !important; }
+            .hoja-constancia { box-shadow: none; margin: 0; width: 100%; height: auto; min-height: 100%; padding: 20mm; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="barra-impresion">
+    <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir Constancia Oficial</button>
+</div>
+
+<div class="hoja-constancia">
+    <!-- Membrete -->
+    <div class="membrete">
+        República Bolivariana de Venezuela<br>
+        Estado Yaracuy<br>
+        Municipio Independencia<br>
+        Concejo Municipal de Independencia<br>
+        Dirección de Talento Humano<br>
+        RIF: G-20006055-7
+    </div>
+
+    <!-- Correlativo -->
+    <div class="correlativo">
+        N°: {{ c.correlativo }}
+    </div>
+
+    <!-- Título -->
+    <div class="titulo-doc">
+        CONSTANCIA DE TRABAJO
+    </div>
+
+    <!-- Redacción Protocolar -->
+    <div class="cuerpo-texto">
+        Quien suscribe, <strong>Lcda. Elena Pérez</strong>, titular de la Cédula de Identidad N° <strong>V-14.567.890</strong>, en mi carácter de <strong>Directora de Talento Humano del Concejo Municipal del Municipio Independencia del Estado Yaracuy</strong>, debidamente facultada para este acto, por medio de la presente hace constar que:
+    </div>
+
+    <div class="cuerpo-texto">
+        El (La) ciudadano(a) <strong>{{ c.nombres|upper }} {{ c.apellidos|upper }}</strong>, titular de la Cédula de Identidad N° <strong>V-{{ c.cedula }}</strong>, presta sus servicios en esta Institución Legislativa Municipal desde el día <strong>{{ c.fecha_ingreso or '01/01/2020' }}</strong>, desempeñando actualmente las funciones inherentes al cargo de <strong>{{ c.cargo_nombre|upper }}</strong>, adscrito(a) a la dependencia de <strong>{{ (c.departamento_nombre or 'Concejo Municipal')|upper }}</strong>.
+    </div>
+
+    {% if c.tipo == 'con_sueldo' %}
+    <div class="cuerpo-texto">
+        Asimismo, se deja constancia de que el funcionario devenga una asignación mensual fija de <strong>BOLÍVARES {{ "{:,.2f}".format((c.sueldo_base|float * 2) if c.sueldo_base else 316.00) }} (Bs. {{ "{:,.2f}".format((c.sueldo_base|float * 2) if c.sueldo_base else 316.00) }})</strong>, cancelada en alícuotas quincenales, sin perjuicio de las primas de tabulador y beneficios de ley correspondientes.
+    </div>
+    {% endif %}
+
+    <div class="cuerpo-texto">
+        Constancia que se expide a solicitud de la parte interesada, en la ciudad de San Felipe, Municipio Independencia del Estado Yaracuy, <strong>{{ fecha_texto }}</strong>.
+    </div>
+
+    <!-- Firma y Sello -->
+    <div class="bloque-firmas">
+        <div class="linea-firma"></div>
+        <strong style="font-size: 14px;">LCDA. ELENA PÉREZ</strong><br>
+        <div class="cargo-firmante">
+            Directora de Talento Humano<br>
+            Concejo Municipal de Independencia<br>
+            Estado Yaracuy
+        </div>
+    </div>
+
+    <!-- Pie institucional -->
+    <div class="pie-pagina">
+        Palacio Municipal de Independencia · Calle 28 entre Av. 4 y 5 · San Felipe, Estado Yaracuy.<br>
+        Documento con validez legal · Verificación y control en la Dirección de Talento Humano.
+    </div>
+</div>
+
+</body>
+</html>

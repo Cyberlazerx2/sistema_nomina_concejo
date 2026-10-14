@@ -70,9 +70,12 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('nomina.historial') }}">
-                                <span class="nav-link-icon d-md-none d-lg-inline-block">📂</span>
-                                <span class="nav-link-title">Historial de Nóminas</span>
+                            <a class="nav-link" href="{{ url_for('trabajadores.constancias_admin') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <!-- Icono de certificación / medalla -->
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="12" cy="9" r="6" /><polyline points="9 14.2 9 21 12 19 15 21 15 14.2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" /></svg>
+                                </span>
+                                <span class="nav-link-title">Constancias de Trabajo</span>
                             </a>
                         </li>
                         <li class="nav-item">
@@ -106,6 +109,15 @@
                             <a class="nav-link" href="{{ url_for('asistencia.listar') }}">
                                 <span class="nav-link-icon d-md-none d-lg-inline-block">📅</span>
                                 <span class="nav-link-title">Supervisión Asistencia</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('trabajadores.constancias_admin') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <!-- Icono de certificación / medalla -->
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="12" cy="9" r="6" /><polyline points="9 14.2 9 21 12 19 15 21 15 14.2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" /></svg>
+                                </span>
+                                <span class="nav-link-title">Constancias de Trabajo</span>
                             </a>
                         </li>
                         <li class="nav-item">
@@ -175,6 +187,14 @@
                             <a class="nav-link" href="{{ url_for('portal.perfil') }}">
                                 <span class="nav-link-icon d-md-none d-lg-inline-block">👤</span>
                                 <span class="nav-link-title">Mi Ficha y Contacto</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('portal.constancias') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /><line x1="9" y1="9" x2="10" y2="9" /><line x1="9" y1="13" x2="15" y2="13" /><line x1="9" y1="17" x2="15" y2="17" /></svg>
+                                </span>
+                                <span class="nav-link-title">Mis Constancias</span>
                             </a>
                         </li>
                         <li class="nav-item">

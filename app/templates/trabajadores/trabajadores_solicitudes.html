@@ -1,116 +1,168 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Solicitudes de Perfil - Concejo Municipal</title>
-    <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); margin-bottom: 20px; }
-        h2 { color: #2c3e50; margin-top: 0; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; vertical-align: middle; }
-        th { background-color: #2c3e50; color: white; }
-        .btn { padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: bold; cursor: pointer; border: none; display: inline-block; }
-        .btn-success { background: #27ae60; color: white; }
-        .btn-danger { background: #c0392b; color: white; }
-        .btn-secondary { background: #6c757d; color: white; }
-        .badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; color: white; text-transform: uppercase; }
-        .badge-pendiente { background: #f39c12; }
-        .badge-aprobada { background: #27ae60; }
-        .badge-rechazada { background: #7f8c8d; }
-        .alert { padding: 10px; border-radius: 4px; margin-bottom: 15px; font-size: 13px; }
-        .alert-success { background-color: #d4edda; color: #155724; }
-        .alert-info { background-color: #d1ecf1; color: #0c5460; }
-        .alert-warning { background-color: #fff3cd; color: #856404; }
-        .alert-danger { background-color: #f8d7da; color: #721c24; }
-        .diff-old { color: #c0392b; text-decoration: line-through; }
-        .diff-new { color: #27ae60; font-weight: bold; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-            <h2>Bandeja de Solicitudes de Actualización de Datos</h2>
-            <div>
-                <a href="{{ url_for('trabajadores.listar') }}" class="btn btn-secondary">Ver Trabajadores</a>
-                <a href="{{ url_for('auth.dashboard') }}" class="btn btn-secondary">Regresar al Panel</a>
+{% extends "base.html" %}
+
+{% block title %}Bandeja de Solicitudes de Perfil - RRHH{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none mb-4">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="text-muted small text-uppercase fw-bold">Dirección de Talento Humano</div>
+            <h2 class="page-title text-dark">
+                Validación de Solicitudes de Perfil
+            </h2>
+            <div class="text-muted mt-1">
+                Concejo Municipal de Independencia · Revisión y aprobación de actualizaciones de datos de contacto consignadas por los trabajadores.
             </div>
         </div>
-
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }}">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-
-        <div class="card">
-            <p style="font-size: 13px; color: #555; margin-bottom: 15px;">
-                * Solicitudes emitidas por los trabajadores desde su portal de autoservicio. Al aprobar, el dato se actualiza automáticamente en el expediente laboral y se registra en la bitácora institucional.
-            </p>
-
-            <table>
-                <thead>
-                    <tr>
-                        <th>N°</th>
-                        <th>Fecha Solicitud</th>
-                        <th>Funcionario</th>
-                        <th>Campo a Modificar</th>
-                        <th>Valor Anterior</th>
-                        <th>Valor Solicitado</th>
-                        <th>Estado</th>
-                        <th>Acción / Observación</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for s in solicitudes %}
-                    <tr style="{{ 'background-color: #fefde8;' if s.estado == 'pendiente' else '' }}">
-                        <td>#{{ s.solicitud_id }}</td>
-                        <td>{{ s.fecha_solicitud }}</td>
-                        <td>
-                            <strong>{{ s.nombres }} {{ s.apellidos }}</strong><br>
-                            <small style="color: #666;">C.I. {{ s.cedula }} | {{ s.cargo_nombre }}</small>
-                        </td>
-                        <td><strong>{{ s.campo|capitalize }}</strong></td>
-                        <td><span class="diff-old">{{ s.valor_actual or '(Vacío)' }}</span></td>
-                        <td><span class="diff-new">{{ s.valor_nuevo }}</span></td>
-                        <td>
-                            <span class="badge badge-{{ s.estado }}">{{ s.estado }}</span>
-                        </td>
-                        <td>
-                            {% if s.estado == 'pendiente' %}
-                            <form method="POST" action="{{ url_for('trabajadores.procesar_solicitud', id=s.solicitud_id) }}">
-                                <div style="margin-bottom: 5px;">
-                                    <input type="text" name="motivo_rechazo" placeholder="Motivo si rechaza..." style="padding: 4px 6px; font-size: 11px; width: 140px; border: 1px solid #ccc; border-radius: 3px;">
-                                </div>
-                                <div style="display: flex; gap: 5px;">
-                                    <button type="submit" name="accion" value="aprobar" class="btn btn-success" onclick="return confirm('¿Aprobar y actualizar expediente?');">✓ Aprobar</button>
-                                    <button type="submit" name="accion" value="rechazar" class="btn btn-danger" onclick="return confirm('¿Rechazar esta solicitud?');">✕ Rechazar</button>
-                                </div>
-                            </form>
-                            {% else %}
-                                <span style="color: #888; font-size: 11px;">
-                                    {% if s.estado == 'rechazada' %}
-                                        Motivo: {{ s.motivo_rechazo or 'Rechazado' }}
-                                    {% else %}
-                                        Aprobada el {{ s.fecha_respuesta }}
-                                    {% endif %}
-                                </span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="8" style="text-align: center; color: #888; padding: 20px;">
-                            No hay solicitudes de cambio de perfil registradas.
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div class="col-auto ms-auto d-flex gap-2">
+            <a href="{{ url_for('trabajadores.listar') }}" class="btn btn-outline-secondary">
+                ← Volver al Directorio
+            </a>
         </div>
     </div>
-</body>
-</html>
+</div>
+
+<!-- 1. SOLICITUDES PENDIENTES (Acción Requerida) -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-warning-lt py-3 d-flex justify-content-between align-items-center">
+        <h3 class="card-title text-dark mb-0 fw-bold">
+            ⏳ Solicitudes Pendientes por Validación
+        </h3>
+        <span class="badge bg-warning text-dark font-monospace fs-5">{{ pendientes|length }} trámite(s)</span>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-hover">
+            <thead>
+                <tr>
+                    <th>Fecha Envío</th>
+                    <th>Funcionario</th>
+                    <th>Dato Solicitado</th>
+                    <th>Valor Actual</th>
+                    <th>Nuevo Valor Propuesto</th>
+                    <th class="w-1 text-center">Decisión</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in pendientes %}
+                <tr>
+                    <td class="font-monospace small text-muted">
+                        {{ p.fecha_solicitud.strftime('%d/%m/%Y %H:%M') if p.fecha_solicitud.strftime is defined else p.fecha_solicitud }}
+                    </td>
+                    <td>
+                        <div class="fw-bold text-dark">{{ p.nombres }} {{ p.apellidos }}</div>
+                        <div class="text-muted small font-monospace">C.I. V-{{ p.cedula }} · {{ p.cargo_nombre }}</div>
+                    </td>
+                    <td>
+                        <span class="badge bg-blue-lt text-uppercase fw-bold fs-5">{{ p.campo }}</span>
+                    </td>
+                    <td class="text-muted small text-truncate" style="max-width: 180px;">
+                        {{ p.valor_actual or '— (Vacío)' }}
+                    </td>
+                    <td class="fw-bold text-success text-truncate" style="max-width: 200px;">
+                        {{ p.valor_nuevo }}
+                    </td>
+                    <td class="text-center">
+                        <div class="d-flex gap-1 justify-content-center">
+                            <!-- Botón Aprobar -->
+                            <form method="POST" action="{{ url_for('trabajadores.procesar_solicitud', id=p.solicitud_id) }}" onsubmit="return confirm('¿Aprobar y actualizar de inmediato el {{ p.campo }} del funcionario?');">
+                                <input type="hidden" name="accion" value="aprobar">
+                                <button type="submit" class="btn btn-sm btn-success fw-bold" title="Aprobar cambio">
+                                    ✓ Aprobar
+                                </button>
+                            </form>
+
+                            <!-- Botón Rechazar (Abre modal) -->
+                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalRechazar{{ p.solicitud_id }}" title="Rechazar solicitud">
+                                ✕
+                            </button>
+                        </div>
+
+                        <!-- Modal para Rechazar -->
+                        <div class="modal fade" id="modalRechazar{{ p.solicitud_id }}" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered">
+                                <form method="POST" action="{{ url_for('trabajadores.procesar_solicitud', id=p.solicitud_id) }}" class="modal-content text-start">
+                                    <input type="hidden" name="accion" value="rechazar">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title fw-bold">Rechazar Solicitud #{{ p.solicitud_id }}</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <p class="text-muted small">
+                                            Indique el motivo por el cual no procede el cambio de <strong>{{ p.campo }}</strong> para <strong>{{ p.nombres }} {{ p.apellidos }}</strong>:
+                                        </p>
+                                        <textarea name="motivo_rechazo" rows="3" class="form-control" placeholder="Ej: El número proporcionado no corresponde con los registros de contacto institucional..." required></textarea>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-danger fw-bold">Confirmar Rechazo</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">
+                        🎉 No hay solicitudes pendientes. Todas las modificaciones se encuentran al día.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 2. HISTORIAL DE SOLICITUDES PROCESADAS -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-light py-3">
+        <h3 class="card-title text-muted mb-0">Historial de Solicitudes Tramitadas</h3>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-sm">
+            <thead>
+                <tr>
+                    <th>Fecha Respuesta</th>
+                    <th>Funcionario</th>
+                    <th>Campo</th>
+                    <th>Nuevo Valor</th>
+                    <th>Estatus</th>
+                    <th>Observación / Motivo</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in procesadas %}
+                <tr>
+                    <td class="font-monospace small text-muted">
+                        {{ r.fecha_respuesta.strftime('%d/%m/%Y') if r.fecha_respuesta and r.fecha_respuesta.strftime is defined else (r.fecha_respuesta or '—') }}
+                    </td>
+                    <td>
+                        <span class="fw-bold text-dark">{{ r.nombres }} {{ r.apellidos }}</span>
+                        <span class="text-muted small font-monospace">(V-{{ r.cedula }})</span>
+                    </td>
+                    <td class="text-capitalize small fw-bold">{{ r.campo }}</td>
+                    <td class="font-monospace small text-truncate" style="max-width: 180px;">{{ r.valor_nuevo }}</td>
+                    <td>
+                        {% if r.estado == 'aprobada' %}
+                            <span class="badge bg-success-lt text-uppercase"><span class="badge-dot bg-success me-1"></span>Aprobada</span>
+                        {% else %}
+                            <span class="badge bg-danger-lt text-uppercase"><span class="badge-dot bg-danger me-1"></span>Rechazada</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-muted small text-truncate" style="max-width: 250px;">
+                        {{ r.motivo_rechazo or 'Aplicado en expediente laboral' }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-3 small">
+                        No hay historial de solicitudes procesadas.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

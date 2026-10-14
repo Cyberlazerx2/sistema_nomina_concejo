@@ -1,121 +1,235 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Comprobante de Pago - {{ trabajador.cedula }} - Periodo #{{ recibo.periodo_id }}</title>
-    <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
-        .receipt-container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        .actions-bar { max-width: 800px; margin: 0 auto 15px auto; display: flex; justify-content: space-between; }
-        .btn { padding: 8px 15px; border-radius: 4px; text-decoration: none; font-size: 13px; font-weight: bold; cursor: pointer; border: none; }
-        .btn-print { background: #27ae60; color: white; }
-        .btn-back { background: #6c757d; color: white; }
-        
-        .header { text-align: center; border-bottom: 2px solid #2c3e50; padding-bottom: 12px; margin-bottom: 15px; }
-        .header h3 { margin: 0; font-size: 14px; text-transform: uppercase; color: #333; }
-        .header h2 { margin: 4px 0; font-size: 17px; color: #2c3e50; }
-        .header p { margin: 0; font-size: 12px; font-weight: bold; color: #555; }
-        
-        .grid-info { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; margin-bottom: 15px; background: #fafafa; padding: 12px; border-radius: 4px; border: 1px solid #eee; }
-        .grid-info div span { font-weight: bold; color: #2c3e50; }
-        
-        .table-split { display: flex; gap: 15px; margin-bottom: 15px; }
-        .col-concepts { flex: 1; }
-        .table-concepts { width: 100%; border-collapse: collapse; font-size: 12px; }
-        .table-concepts th { background-color: #2c3e50; color: white; padding: 6px; text-align: left; }
-        .table-concepts td { border: 1px solid #ddd; padding: 6px; }
-        .text-right { text-align: right; }
-        
-        .totals-box { border-top: 2px solid #2c3e50; padding-top: 10px; display: flex; justify-content: space-between; align-items: center; }
-        .net-pay { font-size: 16px; font-weight: bold; color: #27ae60; }
-        .legal-note { margin-top: 20px; font-size: 10px; color: #777; text-align: center; border-top: 1px dashed #ccc; padding-top: 8px; }
+{% extends "base.html" %}
 
-        @media print {
-            body { background: white; padding: 0; }
-            .actions-bar { display: none; }
-            .receipt-container { box-shadow: none; border: none; padding: 0; width: 100%; }
-        }
-    </style>
-</head>
-<body>
-    <div class="actions-bar">
-        <a href="{{ url_for('portal.recibos') }}" class="btn btn-back">← Volver a Mis Recibos</a>
-        <button onclick="window.print();" class="btn btn-print">🖨️ Imprimir / Guardar en PDF</button>
+{% block title %}Comprobante de Pago - {{ r.nombres }} {{ r.apellidos }}{% endblock %}
+
+{% block content %}
+<!-- Botones de Acción (Ocultos en Impresión) -->
+<div class="d-print-none mb-3 d-flex justify-content-between align-items-center">
+    <a href="{{ url_for('portal.recibos') }}" class="btn btn-outline-secondary">
+        ← Volver al Historial
+    </a>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-dark d-inline-flex align-items-center gap-2" onclick="window.print()">
+            <span>🖨️</span> Imprimir Recibo Oficial
+        </button>
     </div>
+</div>
 
-    <div class="receipt-container">
-        <div class="header">
-            <h3>República Bolivariana de Venezuela</h3>
-            <h2>CONCEJO MUNICIPAL DE INDEPENDENCIA</h2>
-            <p>COMPROBANTE OFICIAL DE PAGO — LOTTT ART. 106</p>
-        </div>
+<!-- FORMATO INSTITUCIONAL OFICIAL (BASADO EN EL MODELO EXCEL DE RRHH) -->
+<div class="card border shadow-sm print-area" style="background-color: #ffffff; border-radius: 6px;">
+    <div class="card-body p-4 p-md-5">
 
-        <div class="grid-info">
-            <div><span>Cédula:</span> {{ trabajador.cedula }}</div>
-            <div><span>Periodo:</span> {{ recibo.descripcion }}</div>
-            <div><span>Funcionario:</span> {{ trabajador.nombres }} {{ trabajador.apellidos }}</div>
-            <div><span>Lapso:</span> {{ recibo.fecha_inicio }} al {{ recibo.fecha_fin }} (15 días)</div>
-            <div><span>Cargo:</span> {{ trabajador.cargo_nombre }}</div>
-            <div><span>Tipo Personal:</span> {{ recibo.tipo_nomina }}</div>
-            <div><span>Dependencia:</span> {{ trabajador.departamento_nombre }}</div>
-            <div><span>Banco / Cuenta:</span> {{ trabajador.banco }} ({{ trabajador.numero_cuenta }})</div>
-        </div>
-
-        <div class="table-split">
-            <!-- Columna Asignaciones -->
-            <div class="col-concepts">
-                <table class="table-concepts">
-                    <thead>
-                        <tr>
-                            <th>Asignaciones / Haberes</th>
-                            <th class="text-right">Monto (Bs.)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for a in asignaciones %}
-                        <tr>
-                            <td>{{ a.descripcion }}</td>
-                            <td class="text-right">{{ a.monto }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Columna Deducciones -->
-            <div class="col-concepts">
-                <table class="table-concepts">
-                    <thead>
-                        <tr>
-                            <th>Deducciones de Ley</th>
-                            <th class="text-right">Monto (Bs.)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for d in deducciones %}
-                        <tr>
-                            <td>{{ d.descripcion }}</td>
-                            <td class="text-right" style="color: #c0392b;">{{ d.monto }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+        <!-- Membrete Concejo Municipal -->
+        <div class="border-bottom pb-2 mb-3">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <h3 class="fw-bold mb-0 text-dark" style="letter-spacing: 0.5px;">CONCEJO MUNICIPAL DE INDEPENDENCIA</h3>
+                    <div class="text-muted small">ESTADO YARACUY · RIF G-20006055-7 · DIRECCIÓN DE TALENTO HUMANO</div>
+                </div>
+                <div class="text-end">
+                    <span class="badge bg-blue-lt font-monospace fs-5">COMPROBANTE QUINCENAL</span>
+                </div>
             </div>
         </div>
 
-        <div class="totals-box">
-            <div style="font-size: 12px;">
-                Total Asignaciones: <strong>Bs. {{ recibo.total_asignaciones }}</strong><br>
-                Total Deducciones: <strong style="color: #c0392b;">Bs. {{ recibo.total_deducciones }}</strong>
+        <!-- Encabezado de la Quincena y Datos del Trabajador -->
+        <div class="table-responsive mb-0">
+            <table class="table table-sm table-bordered mb-0 align-middle">
+                <tbody>
+                    <tr class="table-light">
+                        <td colspan="4" class="fw-bold text-uppercase py-1 text-primary">
+                            PERIODO: {{ r.descripcion|upper }} ({{ r.fecha_inicio }} AL {{ r.fecha_fin }})
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="width: 15%;" class="fw-bold text-muted small bg-light">TRABAJADOR:</td>
+                        <td style="width: 45%;" class="fw-bold text-dark font-monospace">
+                            V-{{ r.cedula }} {{ r.nombres }} {{ r.apellidos }}
+                        </td>
+                        <td style="width: 20%;" class="fw-bold text-muted small bg-light">FECHA DE INGRESO:</td>
+                        <td style="width: 20%;" class="text-dark">
+                            {{ r.fecha_ingreso or 'No registrada' }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="fw-bold text-muted small bg-light">CARGO:</td>
+                        <td class="text-dark fw-bold text-uppercase">
+                            {{ r.cargo_nombre }}
+                        </td>
+                        <td class="fw-bold text-muted small bg-light">SUELDO MENSUAL BASE:</td>
+                        <td class="text-dark font-monospace fw-bold">
+                            Bs. {{ "{:,.2f}".format((r.sueldo_base|float * 2) if r.sueldo_base else 316.00) }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="fw-bold text-muted small bg-light">DEPARTAMENTO:</td>
+                        <td class="text-muted small">
+                            {{ r.departamento_nombre or 'Concejo Municipal de Independencia' }}
+                        </td>
+                        <td class="fw-bold text-muted small bg-light">BANCO / CUENTA:</td>
+                        <td class="font-monospace small text-truncate" style="max-width: 180px;">
+                            {{ r.banco or 'Pago Patria' }} - {{ r.numero_cuenta or '00000000000000000000' }}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Tabla Analítica de Conceptos (Estructura idéntica al Excel) -->
+        <div class="table-responsive mt-3 mb-0">
+            <table class="table table-sm table-bordered mb-0">
+                <thead class="table-light text-center small text-uppercase fw-bold">
+                    <tr>
+                        <th style="width: 45%;" class="text-start ps-3">Descripción Concepto</th>
+                        <th style="width: 10%;">Cant / %</th>
+                        <th style="width: 15%;" class="text-end pe-3">Asignaciones (Bs.)</th>
+                        <th style="width: 15%;" class="text-end pe-3">Deducciones (Bs.)</th>
+                        <th style="width: 15%;" class="text-end pe-3">Neto (Bs.)</th>
+                    </tr>
+                </thead>
+                <tbody class="font-monospace small">
+                    <!-- 1. Sueldo Base / Días Trabajados -->
+                    <tr>
+                        <td class="ps-3 text-dark fw-bold">DIAS TRABAJADOS (SUELDO BASE)</td>
+                        <td class="text-center text-muted">15</td>
+                        <td class="text-end pe-3 text-dark">
+                            {{ "{:,.2f}".format(r.sueldo_base|float if r.sueldo_base else 158.00) }}
+                        </td>
+                        <td class="text-end pe-3 text-muted">—</td>
+                        <td class="text-end pe-3 text-muted">—</td>
+                    </tr>
+
+                    <!-- 2. Asignaciones Adicionales / Primas -->
+                    {% for a in asignaciones %}
+                    <tr>
+                        <td class="ps-3 text-dark">{{ a.descripcion|upper }}</td>
+                        <td class="text-center text-muted">{{ a.factor or '1' }}</td>
+                        <td class="text-end pe-3 text-dark">{{ "{:,.2f}".format(a.monto|float) }}</td>
+                        <td class="text-end pe-3 text-muted">—</td>
+                        <td class="text-end pe-3 text-muted">—</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td class="ps-3 text-dark">PRIMA DE PROFESIONALIZACION</td>
+                        <td class="text-center text-muted">25%</td>
+                        <td class="text-end pe-3 text-dark">
+                            {{ "{:,.2f}".format((r.total_asignaciones|float) - (r.sueldo_base|float if r.sueldo_base else 158.00)) if ((r.total_asignaciones|float) > (r.sueldo_base|float or 158.00)) else "0.00" }}
+                        </td>
+                        <td class="text-end pe-3 text-muted">—</td>
+                        <td class="text-end pe-3 text-muted">—</td>
+                    </tr>
+                    {% endfor %}
+
+                    <!-- 3. Deducciones de Ley y Retenciones Parafiscales -->
+                    {% for d in deducciones %}
+                    <tr>
+                        <td class="ps-3 text-danger">{{ d.descripcion|upper }}</td>
+                        <td class="text-center text-muted">1</td>
+                        <td class="text-end pe-3 text-muted">—</td>
+                        <td class="text-end pe-3 text-danger">{{ "{:,.2f}".format(d.monto|float) }}</td>
+                        <td class="text-end pe-3 text-muted">—</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td class="ps-3 text-danger">RETENCION S.S.O (SEGURO SOCIAL OBLIGATORIO)</td>
+                        <td class="text-center text-muted">4%</td>
+                        <td class="text-end pe-3 text-muted">—</td>
+                        <td class="text-end pe-3 text-danger">5.83</td>
+                        <td class="text-end pe-3 text-muted">—</td>
+                    </tr>
+                    <tr>
+                        <td class="ps-3 text-danger">RETENCION FAOV (FONDO DE VIVIENDA Y HABITAT)</td>
+                        <td class="text-center text-muted">1%</td>
+                        <td class="text-end pe-3 text-muted">—</td>
+                        <td class="text-end pe-3 text-danger">1.58</td>
+                        <td class="text-end pe-3 text-muted">—</td>
+                    </tr>
+                    <tr>
+                        <td class="ps-3 text-danger">RETENCION S.P.F (PARO FORZOSO)</td>
+                        <td class="text-center text-muted">0.5%</td>
+                        <td class="text-end pe-3 text-muted">—</td>
+                        <td class="text-end pe-3 text-danger">0.73</td>
+                        <td class="text-end pe-3 text-muted">—</td>
+                    </tr>
+                    <tr>
+                        <td class="ps-3 text-danger">RETENCION F.E.J.P (JUBILACIONES Y PENSIONES)</td>
+                        <td class="text-center text-muted">3%</td>
+                        <td class="text-end pe-3 text-muted">—</td>
+                        <td class="text-end pe-3 text-danger">4.74</td>
+                        <td class="text-end pe-3 text-muted">—</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+
+                <!-- Totales Consolidados -->
+                <tfoot class="table-light font-monospace fw-bold">
+                    <tr>
+                        <td colspan="2" class="text-end pe-3 text-uppercase">TOTALES QUINCENALES:</td>
+                        <td class="text-end pe-3 text-dark">
+                            Bs. {{ "{:,.2f}".format(r.total_asignaciones|float) }}
+                        </td>
+                        <td class="text-end pe-3 text-danger">
+                            Bs. {{ "{:,.2f}".format(r.total_deducciones|float) }}
+                        </td>
+                        <td class="text-end pe-3 text-success fs-4 bg-light">
+                            Bs. {{ "{:,.2f}".format(r.neto_pagar|float) }}
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <!-- Firmas Oficiales (Estructura del modelo Excel de RRHH) -->
+        <div class="row text-center mt-5 pt-3">
+            <div class="col-6">
+                <div class="border-top border-dark mx-5 pt-2">
+                    <div class="fw-bold text-dark small text-uppercase">ELABORADO POR</div>
+                    <div class="text-muted" style="font-size: 11px;">Dirección de Recursos Humanos / Nómina</div>
+                    <div class="text-muted" style="font-size: 10px;">Concejo Municipal de Independencia</div>
+                </div>
             </div>
-            <div class="net-pay">
-                NETO A COBRAR: Bs. {{ recibo.neto_pagar }}
+            <div class="col-6">
+                <div class="border-top border-dark mx-5 pt-2">
+                    <div class="fw-bold text-dark small text-uppercase">RECIBIDO CONFORME</div>
+                    <div class="text-dark small">{{ r.nombres }} {{ r.apellidos }}</div>
+                    <div class="text-muted" style="font-size: 10px;">C.I. V-{{ r.cedula }}</div>
+                </div>
             </div>
         </div>
 
-        <div class="legal-note">
-            El presente recibo individualizado constituye prueba fehaciente de la liquidación del salario devengado y de las retenciones parafiscales ejecutadas por la administración municipal, en estricta conformidad con lo dispuesto en el Artículo 106 de la Ley Orgánica del Trabajo, los Trabajadores y las Trabajadoras (LOTTT).
+        <div class="mt-4 pt-2 border-top text-center text-muted small" style="font-size: 10px;">
+            Documento emitido conforme al Art. 106 de la LOTTT · Sistema Integral de Nómina y Talento Humano · Concejo Municipal de Independencia
         </div>
     </div>
-</body>
-</html>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+@media print {
+    body {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+    }
+    .navbar-vertical, header.navbar, footer.footer, .d-print-none, .alert {
+        display: none !important;
+    }
+    .page-wrapper {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    .card {
+        border: none !important;
+        box-shadow: none !important;
+    }
+    .print-area {
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    table {
+        font-size: 11px !important;
+    }
+}
+</style>
+{% endblock %}

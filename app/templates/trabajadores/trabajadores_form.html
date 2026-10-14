@@ -1,132 +1,212 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>{{ 'Nuevo Trabajador' if modo == 'crear' else 'Editar Expediente' }} - Concejo Municipal</title>
-    <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
-        .container { max-width: 850px; margin: 0 auto; }
-        .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
-        h2 { color: #2c3e50; margin-top: 0; }
-        .form-row { display: flex; gap: 15px; margin-bottom: 12px; }
-        .form-group { flex: 1; }
-        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 13px; color: #333; }
-        input, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        .btn { padding: 10px 18px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-block; }
-        .btn-success { background: #27ae60; color: white; }
-        .btn-secondary { background: #6c757d; color: white; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="card">
-            <h2>{{ 'Registrar Nuevo Trabajador' if modo == 'crear' else 'Editar Expediente de Trabajador' }}</h2>
-            <form method="POST">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Cédula de Identidad:</label>
-                        <input type="text" name="cedula" value="{{ trabajador.cedula if trabajador else '' }}" required placeholder="V-12345678">
-                    </div>
-                    <div class="form-group">
-                        <label>Nombres:</label>
-                        <input type="text" name="nombres" value="{{ trabajador.nombres if trabajador else '' }}" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Apellidos:</label>
-                        <input type="text" name="apellidos" value="{{ trabajador.apellidos if trabajador else '' }}" required>
-                    </div>
-                </div>
+{% extends "base.html" %}
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Fecha de Nacimiento:</label>
-                        <input type="date" name="fecha_nacimiento" value="{{ trabajador.fecha_nacimiento if trabajador else '' }}">
-                    </div>
-                    <div class="form-group">
-                        <label>Sexo:</label>
-                        <select name="sexo" required>
-                            <option value="M" {% if trabajador and trabajador.sexo == 'M' %}selected{% endif %}>Masculino</option>
-                            <option value="F" {% if trabajador and trabajador.sexo == 'F' %}selected{% endif %}>Femenino</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Teléfono:</label>
-                        <input type="text" name="telefono" value="{{ trabajador.telefono if trabajador else '' }}">
-                    </div>
-                </div>
+{% block title %}{{ 'Nuevo Trabajador' if modo == 'crear' else 'Editar Expediente - ' ~ trabajador.nombres ~ ' ' ~ trabajador.apellidos }}{% endblock %}
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Correo Electrónico:</label>
-                        <input type="email" name="correo" value="{{ trabajador.correo if trabajador else '' }}">
-                    </div>
-                    <div class="form-group">
-                        <label>Dirección de Residencia:</label>
-                        <input type="text" name="direccion" value="{{ trabajador.direccion if trabajador else '' }}">
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Cargo Institucional:</label>
-                        <select name="cargo_id" required>
-                            {% for c in cargos %}
-                                <option value="{{ c.cargo_id }}" {% if trabajador and trabajador.cargo_id == c.cargo_id %}selected{% endif %}>
-                                    {{ c.nombre }} (Base Ref: Bs. {{ c.sueldo_base }})
-                                </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Tipo de Nómina:</label>
-                        <select name="tipo_personal" required>
-                            {% for cod, nom in tipos_personal %}
-                                <option value="{{ cod }}" {% if trabajador and trabajador.tipo_personal == cod %}selected{% endif %}>{{ nom }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Fecha de Ingreso:</label>
-                        <input type="date" name="fecha_ingreso" value="{{ trabajador.fecha_ingreso if trabajador else '' }}" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Sueldo Base Mensual (Bs.):</label>
-                        <input type="number" step="0.01" name="sueldo_base" value="{{ trabajador.sueldo_base if trabajador else '' }}" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Carga Familiar (Hijos):</label>
-                        <input type="number" name="hijos" value="{{ trabajador.hijos if trabajador else 0 }}" min="0" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Nivel de Instrucción:</label>
-                        <select name="nivel_instruccion" required>
-                            {% for n in niveles %}
-                                <option value="{{ n }}" {% if trabajador and trabajador.nivel_instruccion == n %}selected{% endif %}>{{ n }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Entidad Bancaria:</label>
-                        <input type="text" name="banco" value="{{ trabajador.banco if trabajador else 'Banco de Venezuela' }}" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Número de Cuenta (20 Dígitos Patria):</label>
-                        <input type="text" name="numero_cuenta" maxlength="30" value="{{ trabajador.numero_cuenta if trabajador else '' }}" required placeholder="01020000000000000000">
-                    </div>
-                </div>
-
-                <div style="margin-top: 20px;">
-                    <button type="submit" class="btn btn-success">Guardar Expediente</button>
-                    <a href="{{ url_for('trabajadores.listar') }}" class="btn btn-secondary" style="margin-left: 10px;">Cancelar</a>
-                </div>
-            </form>
+{% block content %}
+<div class="page-header d-print-none mb-4">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="text-muted small text-uppercase fw-bold">Dirección de Talento Humano</div>
+            <h2 class="page-title text-dark">
+                {{ 'Incorporación de Nuevo Funcionario' if modo == 'crear' else 'Modificación de Expediente Laboral' }}
+            </h2>
+            <div class="text-muted mt-1">
+                Concejo Municipal de Independencia · {{ 'Registro de ingreso al padrón nominal.' if modo == 'crear' else 'Expediente correspondiente a C.I. V-' ~ trabajador.cedula }}
+            </div>
+        </div>
+        <div class="col-auto ms-auto d-flex gap-2">
+            <a href="{{ url_for('trabajadores.listar') }}" class="btn btn-outline-secondary">
+                ← Volver al Directorio
+            </a>
         </div>
     </div>
-</body>
-</html>
+</div>
+
+<form method="POST">
+    <div class="row g-4">
+        <!-- Bloque 1: Identificación y Datos Personales -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-light py-3">
+                    <h3 class="card-title text-dark mb-0">👤 Identificación y Datos Personales</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-sm-6">
+                            <label class="form-label fw-bold">Cédula de Identidad:</label>
+                            <input type="text" name="cedula" class="form-control font-monospace" value="{{ trabajador.cedula if trabajador else '' }}" required placeholder="V-12345678" autofocus>
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label fw-bold">Sexo:</label>
+                            <select name="sexo" class="form-select" required>
+                                <option value="M" {% if trabajador and trabajador.sexo == 'M' %}selected{% endif %}>Masculino</option>
+                                <option value="F" {% if trabajador and trabajador.sexo == 'F' %}selected{% endif %}>Femenino</option>
+                            </select>
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label fw-bold">Nombres:</label>
+                            <input type="text" name="nombres" class="form-control" value="{{ trabajador.nombres if trabajador else '' }}" required placeholder="Ej: Elena">
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label fw-bold">Apellidos:</label>
+                            <input type="text" name="apellidos" class="form-control" value="{{ trabajador.apellidos if trabajador else '' }}" required placeholder="Ej: Perez">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Fecha de Nacimiento:</label>
+                            <input type="date" name="fecha_nacimiento" class="form-control" value="{{ trabajador.fecha_nacimiento if trabajador else '' }}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bloque 2: Contacto y Ubicación -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-light py-3">
+                    <h3 class="card-title text-dark mb-0">📞 Datos de Contacto y Residencia</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-sm-6">
+                            <label class="form-label fw-bold">Teléfono Móvil / WhatsApp:</label>
+                            <input type="tel" name="telefono" class="form-control" value="{{ trabajador.telefono if trabajador else '' }}" placeholder="0414-0000000">
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label fw-bold">Correo Electrónico:</label>
+                            <input type="email" name="correo" class="form-control" value="{{ trabajador.correo if trabajador else '' }}" placeholder="funcionario@concejo.gob.ve">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Dirección de Habitación:</label>
+                            <textarea name="direccion" rows="4" class="form-control" placeholder="Sector, calle o avenida, número de vivienda...">{{ trabajador.direccion if trabajador else '' }}</textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bloque 3: Adscripción Institucional (RAC) -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-light py-3">
+                    <h3 class="card-title text-dark mb-0">🏛️ Asignación Institucional (RAC)</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Cargo Nominal:</label>
+                            <select name="cargo_id" id="selectCargo" class="form-select" required onchange="sugerirSueldoBase()">
+                                {% for c in cargos %}
+                                    <option value="{{ c.cargo_id }}" data-sueldo="{{ c.sueldo_base }}" {% if trabajador and trabajador.cargo_id == c.cargo_id %}selected{% endif %}>
+                                        {{ c.nombre }} (Base Ref: Bs. {{ "{:,.2f}".format(c.sueldo_base|float) }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label fw-bold">Tipo de Nómina:</label>
+                            <select name="tipo_personal" class="form-select" required>
+                                {% for cod, nom in tipos_personal %}
+                                    <option value="{{ cod }}" {% if trabajador and trabajador.tipo_personal == cod %}selected{% endif %}>{{ nom }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label fw-bold">Nivel de Instrucción (Prima):</label>
+                            <select name="nivel_instruccion" class="form-select" required>
+                                {% for n in niveles %}
+                                    <option value="{{ n }}" {% if trabajador and trabajador.nivel_instruccion == n %}selected{% endif %}>{{ n }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label fw-bold">Carga Familiar (Hijos):</label>
+                            <input type="number" name="hijos" class="form-control" value="{{ trabajador.hijos if trabajador else 0 }}" min="0" required>
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label fw-bold">Fecha de Ingreso:</label>
+                            <input type="date" name="fecha_ingreso" class="form-control" value="{{ trabajador.fecha_ingreso if trabajador else '' }}" required>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bloque 4: Salario y Dispersión Bancaria -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-light py-3">
+                    <h3 class="card-title text-dark mb-0">💳 Condiciones Salariales y Cuenta Patria</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Sueldo Base Mensual (Bs.):</label>
+                            <div class="input-group">
+                                <span class="input-group-text">Bs.</span>
+                                <input type="number" step="0.01" name="sueldo_base" id="inputSueldoBase" class="form-control font-monospace fs-4 fw-bold text-dark" value="{{ trabajador.sueldo_base if trabajador else '' }}" required placeholder="316.00">
+                            </div>
+                            <small class="text-muted">La alícuota quincenal corresponderá al 50% de este importe.</small>
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label fw-bold">Entidad Bancaria:</label>
+                            <input type="text" name="banco" class="form-control" value="{{ trabajador.banco if trabajador else 'Banco Bicentenario' }}" required>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="d-flex justify-content-between">
+                                <label class="form-label fw-bold">Cuenta (20 Dígitos):</label>
+                                <span class="small font-monospace text-muted" id="contadorDigitos">0/20</span>
+                            </div>
+                            <input type="text" name="numero_cuenta" id="inputCuenta" maxlength="20" class="form-control font-monospace" value="{{ trabajador.numero_cuenta if trabajador else '' }}" required placeholder="01750000000000000000" oninput="validarCuenta(this)">
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info mt-3 mb-0 py-2 small">
+                        🔒 La cuenta debe tener exactamente 20 dígitos para el archivo TXT del Sistema Patria.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Barra de Acciones -->
+    <div class="card card-body bg-light mt-4 border shadow-sm d-flex flex-row justify-content-between align-items-center">
+        <a href="{{ url_for('trabajadores.listar') }}" class="btn btn-outline-secondary">
+            Cancelar
+        </a>
+        <button type="submit" class="btn btn-success btn-lg px-4 fw-bold">
+            💾 {{ 'Incorporar al Padrón de Nómina' if modo == 'crear' else 'Guardar Modificaciones' }}
+        </button>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function validarCuenta(input) {
+        input.value = input.value.replace(/\D/g, '');
+        const largo = input.value.length;
+        const contador = document.getElementById('contadorDigitos');
+        contador.textContent = largo + '/20';
+        if (largo === 20) {
+            contador.className = 'small font-monospace text-success fw-bold';
+        } else {
+            contador.className = 'small font-monospace text-danger fw-bold';
+        }
+    }
+
+    function sugerirSueldoBase() {
+        const select = document.getElementById('selectCargo');
+        const sueldoInput = document.getElementById('inputSueldoBase');
+        const opt = select.options[select.selectedIndex];
+        if (opt && opt.getAttribute('data-sueldo') && (!sueldoInput.value || sueldoInput.value === '0')) {
+            sueldoInput.value = parseFloat(opt.getAttribute('data-sueldo')).toFixed(2);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const inputCuenta = document.getElementById('inputCuenta');
+        if (inputCuenta) validarCuenta(inputCuenta);
+    });
+</script>
+{% endblock %}

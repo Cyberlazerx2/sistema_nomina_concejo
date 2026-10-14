@@ -1,110 +1,183 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Configuración de Conceptos Salariales - Concejo Municipal</title>
-    <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
-        h2 { color: #2c3e50; margin-top: 0; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; vertical-align: middle; }
-        th { background-color: #2c3e50; color: white; }
-        .btn { padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: bold; cursor: pointer; border: none; }
-        .btn-success { background: #27ae60; color: white; }
-        .btn-secondary { background: #6c757d; color: white; }
-        .tag-tipo { padding: 3px 6px; border-radius: 3px; font-size: 11px; font-weight: bold; text-transform: uppercase; color: white; }
-        .tag-asignacion { background: #2980b9; }
-        .tag-deduccion { background: #c0392b; }
-        .badge-obligatorio { color: #27ae60; font-weight: bold; font-size: 11px; }
-        .badge-opcional { color: #7f8c8d; font-size: 11px; }
-        .input-valor { width: 90px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; text-align: right; font-family: monospace; }
-        .alert { padding: 10px; border-radius: 4px; margin-bottom: 15px; font-size: 13px; }
-        .alert-success { background-color: #d4edda; color: #155724; }
-        .alert-danger { background-color: #f8d7da; color: #721c24; }
-        .alert-warning { background-color: #fff3cd; color: #856404; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-            <h2>Catálogo y Parametrización de Conceptos</h2>
-            <div>
-                <a href="{{ url_for('auth.dashboard') }}" class="btn btn-secondary">Regresar al Panel</a>
+{% extends "base.html" %}
+
+{% block title %}Parametrización Salarial y Deducciones de Ley{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none mb-4">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="text-muted small text-uppercase fw-bold">Configuración Institucional</div>
+            <h2 class="page-title text-dark">
+                Parametrización de Conceptos y Fórmulas
+            </h2>
+            <div class="text-muted mt-1">
+                Concejo Municipal de Independencia · Ajuste simultáneo de primas de tabulador y retenciones parafiscales de ley.
+            </div>
+        </div>
+    </div>
+</div>
+
+<form method="POST" action="{{ url_for('config.conceptos') }}">
+    <div class="row g-4">
+        <!-- Bloque 1: Asignaciones y Primas de Tabulador -->
+        <div class="col-xl-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-primary text-white py-3 d-flex justify-content-between align-items-center">
+                    <h3 class="card-title text-white mb-0">📈 Asignaciones y Primas</h3>
+                    <span class="badge bg-white text-primary fw-bold">{{ asignaciones|length }} conceptos</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-vcenter table-sm card-table">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="w-1 text-center" title="Activo en nómina">Act.</th>
+                                    <th>Concepto</th>
+                                    <th style="width: 120px;">Modalidad</th>
+                                    <th class="text-center" style="width: 100px;">Vigente</th>
+                                    <th class="text-end" style="width: 120px;">Nuevo Parámetro</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for a in asignaciones %}
+                                <tr class="fila-concepto">
+                                    <td class="text-center">
+                                        <input type="hidden" name="concepto_id[]" value="{{ a.concepto_id }}">
+                                        <input type="checkbox" name="activo[]" value="{{ a.concepto_id }}" class="form-check-input" {% if a.activo_display %}checked{% endif %} title="Activar/Desactivar">
+                                    </td>
+                                    <td>
+                                        <input type="text" name="nombre[]" class="form-control form-control-sm fw-bold border-0 bg-transparent p-0" value="{{ a.nombre_display }}">
+                                        <span class="badge bg-light text-muted border font-monospace mt-1" style="font-size: 10px;">{{ a.codigo_display }}</span>
+                                    </td>
+                                    <td>
+                                        <select name="tipo_calculo[]" class="form-select form-select-sm select-modalidad">
+                                            <option value="porcentaje" {% if a.tipo_calculo_display == 'porcentaje' %}selected{% endif %}>% Porcentaje</option>
+                                            <option value="monto_fijo" {% if a.tipo_calculo_display == 'monto_fijo' %}selected{% endif %}>Bs. Fijo</option>
+                                            <option value="dias" {% if a.tipo_calculo_display == 'dias' %}selected{% endif %}>Días</option>
+                                        </select>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-blue-lt font-monospace px-2 py-1 fs-5" title="Valor actualmente aplicado">
+                                            {{ a.etiqueta_actual }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        <input type="number" 
+                                               step="any" 
+                                               name="valor[]" 
+                                               class="form-control form-control-sm text-end font-monospace input-valor" 
+                                               value="{{ a.valor_limpio }}" 
+                                               data-original="{{ a.valor_limpio }}"
+                                               placeholder="0"
+                                               required>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-3">No hay asignaciones registradas.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }}">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-
-        <div class="card">
-            <p style="font-size: 13px; color: #555; margin-bottom: 15px;">
-                * Parámetros contables del motor de nómina bajo custodia de la <strong>Dirección de Recursos Humanos</strong>. La alteración de <strong>valor</strong> o <strong>estado activo</strong> queda auditada automáticamente con sello de fecha, usuario e IP. El código, método y naturaleza no son modificables para mantener la integridad referencial.
-            </p>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Código</th>
-                        <th>Nombre y Fundamento</th>
-                        <th>Tipo</th>
-                        <th>Método / Base</th>
-                        <th>Obligatorio</th>
-                        <th>Valor Actual / Tasa</th>
-                        <th>Estado</th>
-                        <th>Acción</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for c in conceptos %}
-                    <tr>
-                        <form method="POST" action="{{ url_for('config.actualizar_concepto', id=c.concepto_id) }}">
-                            <td><strong>{{ c.codigo }}</strong></td>
-                            <td>
-                                {{ c.nombre }}<br>
-                                <small style="color: #7f8c8d;">{{ c.fundamento if c.fundamento else 'Sin fundamento legal explícito' }}</small>
-                            </td>
-                            <td>
-                                <span class="tag-tipo tag-{{ c.tipo }}">{{ c.tipo }}</span>
-                            </td>
-                            <td>
-                                {{ c.metodo }}<br>
-                                <small style="color: #555;">{{ c.base_calculo }}</small>
-                            </td>
-                            <td>
-                                {% if c.obligatorio %}
-                                    <span class="badge-obligatorio">Sí (Ley)</span>
+        <!-- Bloque 2: Deducciones y Retenciones Legales -->
+        <div class="col-xl-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-danger text-white py-3 d-flex justify-content-between align-items-center">
+                    <h3 class="card-title text-white mb-0">📉 Deducciones y Retenciones</h3>
+                    <span class="badge bg-white text-danger fw-bold">{{ deducciones|length }} conceptos</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-vcenter table-sm card-table">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="w-1 text-center" title="Activo en nómina">Act.</th>
+                                    <th>Concepto</th>
+                                    <th style="width: 120px;">Modalidad</th>
+                                    <th class="text-center" style="width: 100px;">Vigente</th>
+                                    <th class="text-end" style="width: 120px;">Nuevo Parámetro</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for d in deducciones %}
+                                <tr class="fila-concepto">
+                                    <td class="text-center">
+                                        <input type="hidden" name="concepto_id[]" value="{{ d.concepto_id }}">
+                                        <input type="checkbox" name="activo[]" value="{{ d.concepto_id }}" class="form-check-input" {% if d.activo_display %}checked{% endif %} title="Activar/Desactivar">
+                                    </td>
+                                    <td>
+                                        <input type="text" name="nombre[]" class="form-control form-control-sm fw-bold text-danger border-0 bg-transparent p-0" value="{{ d.nombre_display }}">
+                                        <span class="badge bg-light text-muted border font-monospace mt-1" style="font-size: 10px;">{{ d.codigo_display }}</span>
+                                    </td>
+                                    <td>
+                                        <select name="tipo_calculo[]" class="form-select form-select-sm select-modalidad">
+                                            <option value="porcentaje" {% if d.tipo_calculo_display == 'porcentaje' %}selected{% endif %}>% Porcentaje</option>
+                                            <option value="monto_fijo" {% if d.tipo_calculo_display == 'monto_fijo' %}selected{% endif %}>Bs. Fijo</option>
+                                        </select>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-red-lt font-monospace px-2 py-1 fs-5" title="Valor actualmente aplicado">
+                                            {{ d.etiqueta_actual }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        <input type="number" 
+                                               step="any" 
+                                               name="valor[]" 
+                                               class="form-control form-control-sm text-end font-monospace text-danger input-valor" 
+                                               value="{{ d.valor_limpio }}" 
+                                               data-original="{{ d.valor_limpio }}"
+                                               placeholder="0"
+                                               required>
+                                    </td>
+                                </tr>
                                 {% else %}
-                                    <span class="badge-opcional">No (RAC)</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <input type="number" step="0.0001" name="valor" class="input-valor" value="{{ c.valor }}" required>
-                            </td>
-                            <td style="text-align: center;">
-                                <label style="cursor: pointer; font-size: 12px;">
-                                    <input type="checkbox" name="activo" value="1" {% if c.activo %}checked{% endif %}>
-                                    {{ 'Activo' if c.activo else 'Inactivo' }}
-                                </label>
-                            </td>
-                            <td>
-                                <button type="submit" class="btn btn-success">Guardar</button>
-                            </td>
-                        </form>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="8" style="text-align: center; color: #7f8c8d;">No hay conceptos registrados en la base de datos.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-3">No hay deducciones registradas.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
-</body>
-</html>
+
+    <!-- Barra Inferior de Acción y Guardado -->
+    <div class="card card-body bg-light mt-4 border shadow-sm d-flex flex-row justify-content-between align-items-center">
+        <div>
+            <span class="fw-bold text-dark">¿Desea aplicar estos ajustes a las próximas emisiones?</span>
+            <div class="text-muted small">
+                Al guardar, la nueva parametrización afectará automáticamente los cálculos de pre-nómina y recálculos pendientes.
+            </div>
+        </div>
+        <button type="submit" class="btn btn-success btn-lg px-4 fw-bold">
+            💾 Guardar Cambios en Bloque
+        </button>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Detección de cambios en tiempo real para feedback visual
+    document.querySelectorAll('.input-valor').forEach(input => {
+        input.addEventListener('input', function() {
+            const original = parseFloat(this.getAttribute('data-original')) || 0;
+            const actual = parseFloat(this.value) || 0;
+            
+            if (original !== actual) {
+                this.classList.add('border-warning', 'bg-yellow-lt', 'fw-bold');
+            } else {
+                this.classList.remove('border-warning', 'bg-yellow-lt', 'fw-bold');
+            }
+        });
+    });
+</script>
+{% endblock %}
