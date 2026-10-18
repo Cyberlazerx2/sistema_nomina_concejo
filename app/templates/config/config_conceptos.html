@@ -14,6 +14,12 @@
                 Concejo Municipal de Independencia · Ajuste simultáneo de primas de tabulador y retenciones parafiscales de ley.
             </div>
         </div>
+        <!-- NUEVO BOTÓN PARA CREAR CONCEPTOS -->
+        <div class="col-auto ms-auto d-flex gap-2">
+            <button type="button" class="btn btn-primary d-inline-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#modalNuevoConcepto">
+                <span>➕</span> Nuevo Concepto / Retención
+            </button>
+        </div>
     </div>
 </div>
 
@@ -162,6 +168,58 @@
         </button>
     </div>
 </form>
+
+<!-- Modal para Crear Nuevo Concepto o Deducción -->
+<div class="modal modal-blur fade" id="modalNuevoConcepto" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="POST" action="{{ url_for('config.crear_concepto') }}" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">Registrar Nuevo Concepto o Deducción</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Código Interno (Ej: CESTATICKET, CAJA_AHORRO):</label>
+                    <input type="text" name="codigo" class="form-control font-uppercase" placeholder="EJ: PRIMA_TRANSPORTE" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Nombre del Concepto:</label>
+                    <input type="text" name="nombre" class="form-control" placeholder="Ej: Prima de Transporte" required>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label fw-bold">Naturaleza:</label>
+                        <select name="tipo" class="form-select" required>
+                            <option value="asignacion">Asignación (Suma)</option>
+                            <option value="deduccion">Deducción (Resta)</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold">Modalidad:</label>
+                        <select name="metodo" class="form-select" required>
+                            <option value="porcentaje">Porcentaje (%)</option>
+                            <option value="fijo">Monto Fijo (Bs.)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Valor / Tasa Inicial:</label>
+                    <input type="number" step="any" name="valor" class="form-control font-monospace" placeholder="0.00" required>
+                </div>
+                <div class="mb-2">
+                    <label class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="obligatorio" value="1" checked>
+                        <span class="form-check-label fw-bold">Aplicar a toda la plantilla de forma obligatoria</span>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-primary fw-bold">Guardar Concepto</button>
+            </div>
+        </form>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}

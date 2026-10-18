@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}Catálogo de Tipos de Nómina - RRHH{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none mb-4">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="text-muted small text-uppercase fw-bold">Configuración de Talento Humano</div>
+            <h2 class="page-title text-dark">
+                Catálogo de Tipos de Nómina
+            </h2>
+            <div class="text-muted mt-1">
+                Concejo Municipal de Independencia · Gestión de nóminas ordinarias, bonificaciones y frecuencia de pago.
+            </div>
+        </div>
+        <div class="col-auto ms-auto d-flex gap-2">
+            <a href="{{ url_for('nomina.historial') }}" class="btn btn-outline-secondary">
+                ← Volver a Nóminas
+            </a>
+            <button type="button" class="btn btn-primary d-inline-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#modalTipoNomina" onclick="abrirModalNuevo()">
+                <span>➕</span> Nuevo Tipo de Nómina
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-light py-3 d-flex justify-content-between align-items-center">
+        <h3 class="card-title text-dark mb-0">Padrones y Nóminas Configuradas</h3>
+        <span class="badge bg-blue-lt">{{ tipos|length }} tipos registrados</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-hover">
+            <thead>
+                <tr>
+                    <th>Denominación de la Nómina</th>
+                    <th>Frecuencia</th>
+                    <th class="text-center">Régimen de Deducciones</th>
+                    <th class="text-center">Alcance de Personal</th>
+                    <th class="text-center">Trabajadores</th>
+                    <th class="text-center">Estatus</th>
+                    <th class="w-1 text-center">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in tipos %}
+                <tr>
+                    <td>
+                        <div class="fw-bold text-dark">{{ t.nombre }}</div>
+                        <div class="text-muted small">{{ t.total_periodos }} emisiones procesadas en el historial</div>
+                    </td>
+                    <td class="text-capitalize text-muted small">{{ t.periodicidad }}</td>
+                    <td class="text-center">
+                        {% if t.aplica_leyes_sociales %}
+                            <span class="badge bg-green-lt" title="Descuenta SSO, FAOV, SPF y Fondo de Jubilación">
+                                Con Retenciones de Ley
+                            </span>
+                        {% else %}
+                            <span class="badge bg-purple-lt" title="Se paga íntegro sin deducciones parafiscales">
+                                Pago Neto (Sin Retenciones)
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if t.aplica_a_todos %}
+                            <span class="badge bg-blue-lt">Toda la Plantilla</span>
+                        {% else %}
+                            <span class="badge bg-secondary-lt">Personal Asignado</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center font-monospace text-muted">
+                        {% if t.aplica_a_todos %}
+                            Todos
+                        {% else %}
+                            {{ t.total_adscritos }} activo(s)
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if t.activo %}
+                            <span class="badge bg-success-lt text-uppercase"><span class="badge-dot bg-success me-1"></span>Activo</span>
+                        {% else %}
+                            <span class="badge bg-danger-lt text-uppercase"><span class="badge-dot bg-danger me-1"></span>Inactivo</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <div class="d-flex gap-1 justify-content-center">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" title="Modificar Nómina"
+                                onclick="abrirModalEditar('{{ t.codigo }}', '{{ t.nombre }}', '{{ t.periodicidad }}', {{ 1 if t.aplica_leyes_sociales else 0 }}, {{ 1 if t.aplica_a_todos else 0 }})">
+                                ✏️
+                            </button>
+                            <form method="POST" action="{{ url_for('nomina.toggle_tipo', codigo=t.codigo) }}" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-{{ 'warning' if t.activo else 'success' }}" title="{{ 'Desactivar' if t.activo else 'Activar' }}">
+                                    {{ '⏸️' if t.activo else '▶️' }}
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Amigable para RRHH (Sin campos técnicos de BD) -->
+<div class="modal modal-blur fade" id="modalTipoNomina" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="POST" action="{{ url_for('nomina.guardar_tipo') }}" class="modal-content">
+            <input type="hidden" name="codigo_original" id="modalCodigoOriginal" value="">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="modalTitulo">Registrar Nuevo Tipo de Nómina</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Nombre de la Nómina o Beneficio:</label>
+                    <input type="text" name="nombre" id="modalNombre" class="form-control" placeholder="Ej: Nómina de Jubilados y Pensionados" required autofocus>
+                    <small class="text-muted">Nombre oficial que aparecerá en los recibos de pago y reportes.</small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Frecuencia de Pago:</label>
+                    <select name="periodicidad" id="modalPeriodicidad" class="form-select" required>
+                        <option value="quincenal">Quincenal (Pago cada 15 días)</option>
+                        <option value="mensual">Mensual (Un pago al mes)</option>
+                        <option value="especial">Especial / Pago Único</option>
+                    </select>
+                </div>
+
+                <div class="mb-3 pt-2 border-top">
+                    <label class="form-check form-switch mb-1">
+                        <input class="form-check-input" type="checkbox" name="aplica_leyes_sociales" id="modalLeyesSociales" value="1" checked>
+                        <span class="form-check-label fw-bold">Aplicar deducciones de ley (IVSS, FAOV, SPF, Jubilación)</span>
+                    </label>
+                    <small class="text-muted d-block ps-4">
+                        Desactive esta casilla si se trata de un <strong>bono especial o beneficio no salarial</strong> que deba pagarse completo sin descuentos.
+                    </small>
+                </div>
+
+                <div class="mb-2 pt-2 border-top">
+                    <label class="form-check form-switch mb-1">
+                        <input class="form-check-input" type="checkbox" name="aplica_a_todos" id="modalAplicaTodos" value="1">
+                        <span class="form-check-label fw-bold">Incluir a todos los trabajadores activos del Concejo</span>
+                    </label>
+                    <small class="text-muted d-block ps-4">
+                        Active esta casilla cuando el beneficio aplique a toda la institución por igual (como Cestaticket o bonificaciones generales).
+                    </small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-primary fw-bold" id="modalBotonSubmit">Guardar Nómina</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function abrirModalNuevo() {
+        document.getElementById('modalTitulo').textContent = 'Registrar Nuevo Tipo de Nómina';
+        document.getElementById('modalCodigoOriginal').value = '';
+        document.getElementById('modalNombre').value = '';
+        document.getElementById('modalPeriodicidad').value = 'quincenal';
+        document.getElementById('modalLeyesSociales').checked = true;
+        document.getElementById('modalAplicaTodos').checked = false;
+        document.getElementById('modalBotonSubmit').textContent = 'Guardar Nómina';
+    }
+
+    function abrirModalEditar(codigo, nombre, periodicidad, leyes, todos) {
+        document.getElementById('modalTitulo').textContent = 'Editar Nómina';
+        document.getElementById('modalCodigoOriginal').value = codigo;
+        document.getElementById('modalNombre').value = nombre;
+        document.getElementById('modalPeriodicidad').value = periodicidad;
+        document.getElementById('modalLeyesSociales').checked = (leyes === 1);
+        document.getElementById('modalAplicaTodos').checked = (todos === 1);
+        document.getElementById('modalBotonSubmit').textContent = 'Guardar Cambios';
+        var modal = new bootstrap.Modal(document.getElementById('modalTipoNomina'));
+        modal.show();
+    }
+</script>
+{% endblock %}

@@ -1,5 +1,6 @@
 import datetime
 import io
+import re
 from decimal import Decimal, ROUND_HALF_UP
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, send_file
 from app.database import get_db_connection
@@ -7,15 +8,6 @@ from app.modules.payroll_engine import calcular_quincena_trabajador
 
 nomina_bp = Blueprint('nomina', __name__)
 
-TIPOS_NOMINA = [
-    ('empleado_fijo', 'Empleados Fijos'),
-    ('obrero_fijo', 'Obreros Fijos'),
-    ('alto_nivel', 'Alto Nivel (Concejales)'),
-    ('libre_remocion', 'Libre Nombramiento y Remoción'),
-    ('empleado_contratado', 'Empleados Contratados'),
-    ('obrero_contratado', 'Obreros Contratados'),
-    ('cestaticket', 'Cestaticket Mensual')
-]
 
 # -------------------------------------------------------------------------
 # HISTORIAL Y TABLERO DE NÓMINAS
@@ -34,81 +26,127 @@ def historial():
     try:
         with conexion.cursor() as cursor:
             sql = """
-                SELECT p.*, u.nombre_usuario AS analista_nombre
+                SELECT p.*, u.nombre_usuario AS analista_nombre, tn.nombre AS tipo_nomina_nombre
                 FROM periodo_nomina p
                 LEFT JOIN usuario u ON p.elaborada_por = u.usuario_id
+                LEFT JOIN tipo_nomina tn ON p.tipo_nomina = tn.codigo
                 ORDER BY p.periodo_id DESC;
             """
             cursor.execute(sql)
             periodos = cursor.fetchall()
-            return render_template('nomina/nomina_historial.html', periodos=periodos, tipos_nomina=TIPOS_NOMINA)
+
+            # Convertir a pares (codigo, nombre) para mantener compatibilidad con {% for cod, nom in tipos_nomina %}
+            cursor.execute("SELECT codigo, nombre FROM tipo_nomina WHERE activo = true ORDER BY nombre ASC;")
+            tipos_nomina = [(r['codigo'], r['nombre']) for r in cursor.fetchall()]
+
+            return render_template('nomina/nomina_historial.html', periodos=periodos, tipos_nomina=tipos_nomina)
     finally:
         conexion.close()
 
-# -------------------------------------------------------------------------
-# DETALLE DEL PERIODO DE NÓMINA
-# -------------------------------------------------------------------------
-@nomina_bp.route('/detalle/<int:periodo_id>')
-def detalle(periodo_id):
-    if 'usuario_id' not in session:
-        return redirect(url_for('auth.login'))
 
-    roles_permitidos = ['analista_rrhh', 'directora_rrhh', 'tecnico_informatica']
-    if session.get('rol') not in roles_permitidos:
-        flash('Acceso denegado.', 'danger')
-        return redirect(url_for('auth.dashboard'))
+# -------------------------------------------------------------------------
+# ADMINISTRACIÓN DE TIPOS DE NÓMINA (Catálogo Dinámico)
+# -------------------------------------------------------------------------
+@nomina_bp.route('/tipos')
+def tipos_catalogo():
+    if 'usuario_id' not in session or session.get('rol') not in ['directora_rrhh', 'tecnico_informatica']:
+        flash('Acceso restringido: Solo la Dirección de RRHH puede parametrizar tipos de nómina.', 'danger')
+        return redirect(url_for('nomina.historial'))
 
     conexion = get_db_connection()
     try:
         with conexion.cursor() as cursor:
-            sql_p = """
-                SELECT p.*, 
-                       u1.nombre_usuario AS analista_nom,
-                       u2.nombre_usuario AS directora_nom,
-                       u3.nombre_usuario AS presidente_nom
-                FROM periodo_nomina p
-                LEFT JOIN usuario u1 ON p.elaborada_por = u1.usuario_id
-                LEFT JOIN usuario u2 ON p.revisada_por = u2.usuario_id
-                LEFT JOIN usuario u3 ON p.aprobada_por = u3.usuario_id
-                WHERE p.periodo_id = %s;
+            sql = """
+                SELECT tn.*,
+                       COUNT(DISTINCT t.trabajador_id) AS total_adscritos,
+                       COUNT(DISTINCT pn.periodo_id) AS total_periodos
+                FROM tipo_nomina tn
+                LEFT JOIN trabajador t ON tn.codigo = t.tipo_personal AND t.activo = true
+                LEFT JOIN periodo_nomina pn ON tn.codigo = pn.tipo_nomina
+                GROUP BY tn.codigo, tn.nombre, tn.periodicidad, tn.aplica_leyes_sociales, tn.aplica_a_todos, tn.activo
+                ORDER BY tn.nombre ASC;
             """
-            cursor.execute(sql_p, (periodo_id,))
-            periodo = cursor.fetchone()
-
-            if not periodo:
-                flash('El periodo solicitado no existe.', 'warning')
-                return redirect(url_for('nomina.historial'))
-
-            sql_trab = """
-                SELECT nt.*, t.cedula, t.nombres, t.apellidos, t.banco, t.numero_cuenta, 
-                       t.fecha_ingreso, t.sueldo_base, c.nombre AS cargo_nombre,
-                       d.nombre AS departamento_nombre
-                FROM nomina_trabajador nt
-                INNER JOIN trabajador t ON nt.trabajador_id = t.trabajador_id
-                INNER JOIN cargo c ON t.cargo_id = c.cargo_id
-                LEFT JOIN departamento d ON c.departamento_id = d.departamento_id
-                WHERE nt.periodo_id = %s
-                ORDER BY t.apellidos ASC, t.nombres ASC;
-            """
-            cursor.execute(sql_trab, (periodo_id,))
-            trabajadores = cursor.fetchall()
-
-            for trab in trabajadores:
-                sql_det = """
-                    SELECT codigo_concepto, descripcion, tipo, monto 
-                    FROM nomina_detalle 
-                    WHERE nomina_trabajador_id = %s
-                    ORDER BY tipo ASC, monto DESC;
-                """
-                cursor.execute(sql_det, (trab['nomina_trabajador_id'],))
-                trab['desglose'] = cursor.fetchall()
-
-            return render_template('nomina/nomina_detalle.html', periodo=periodo, trabajadores=trabajadores)
+            cursor.execute(sql)
+            tipos = cursor.fetchall()
+            return render_template('nomina/nomina_tipos.html', tipos=tipos)
     finally:
         conexion.close()
 
+
+@nomina_bp.route('/tipos/guardar', methods=['POST'])
+def guardar_tipo():
+    if 'usuario_id' not in session or session.get('rol') not in ['directora_rrhh', 'tecnico_informatica']:
+        flash('Acceso no autorizado.', 'danger')
+        return redirect(url_for('nomina.historial'))
+
+    codigo_original = request.form.get('codigo_original', '').strip()
+    nombre = request.form.get('nombre', '').strip()
+    periodicidad = request.form.get('periodicidad', 'quincenal')
+    aplica_leyes = 1 if request.form.get('aplica_leyes_sociales') == '1' else 0
+    aplica_todos = 1 if request.form.get('aplica_a_todos') == '1' else 0
+
+    if not nombre:
+        flash('El nombre del tipo de nómina es obligatorio.', 'warning')
+        return redirect(url_for('nomina.tipos_catalogo'))
+
+    conexion = get_db_connection()
+    try:
+        with conexion.cursor() as cursor:
+            if codigo_original:
+                # Modificación de un tipo existente
+                cursor.execute("""
+                    UPDATE tipo_nomina 
+                    SET nombre = %s, periodicidad = %s, aplica_leyes_sociales = %s, aplica_a_todos = %s
+                    WHERE codigo = %s;
+                """, (nombre, periodicidad, aplica_leyes, aplica_todos, codigo_original))
+                flash(f"Tipo de nómina '{nombre}' actualizado con éxito.", 'success')
+            else:
+                # Creación de un nuevo tipo: generar slug limpio
+                codigo = re.sub(r'[^a-zA-Z0-9_]', '', request.form.get('codigo', '').strip().lower().replace(' ', '_'))
+                if not codigo:
+                    codigo = re.sub(r'[^a-zA-Z0-9_]', '', nombre.lower().replace(' ', '_'))[:25]
+
+                cursor.execute("SELECT codigo FROM tipo_nomina WHERE codigo = %s;", (codigo,))
+                if cursor.fetchone():
+                    flash(f"El identificador '{codigo}' ya existe.", 'warning')
+                    return redirect(url_for('nomina.tipos_catalogo'))
+
+                cursor.execute("""
+                    INSERT INTO tipo_nomina (codigo, nombre, periodicidad, aplica_leyes_sociales, aplica_a_todos, activo)
+                    VALUES (%s, %s, %s, %s, %s, 1);
+                """, (codigo, nombre, periodicidad, aplica_leyes, aplica_todos))
+                flash(f"Nuevo tipo de nómina '{nombre}' configurado e incorporado al sistema.", 'success')
+
+            conexion.commit()
+    except Exception as e:
+        conexion.rollback()
+        flash(f'Error al registrar tipo de nómina: {e}', 'danger')
+    finally:
+        conexion.close()
+
+    return redirect(url_for('nomina.tipos_catalogo'))
+
+
+@nomina_bp.route('/tipos/<codigo>/toggle', methods=['POST'])
+def toggle_tipo(codigo):
+    if 'usuario_id' not in session or session.get('rol') not in ['directora_rrhh', 'tecnico_informatica']:
+        flash('Acceso no autorizado.', 'danger')
+        return redirect(url_for('nomina.historial'))
+
+    conexion = get_db_connection()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute("UPDATE tipo_nomina SET activo = NOT activo WHERE codigo = %s;", (codigo,))
+            conexion.commit()
+            flash(f"Estatus del tipo de nómina '{codigo}' actualizado.", 'info')
+    finally:
+        conexion.close()
+
+    return redirect(url_for('nomina.tipos_catalogo'))
+
+
 # -------------------------------------------------------------------------
-# GENERACIÓN DE PRE-NÓMINA
+# GENERACIÓN DE PRE-NÓMINA (Lógica Dinámica de Selección y Cálculo)
 # -------------------------------------------------------------------------
 @nomina_bp.route('/generar', methods=['GET', 'POST'])
 def generar():
@@ -126,10 +164,21 @@ def generar():
                 fecha_fin = request.form.get('fecha_fin')
                 descripcion = request.form.get('descripcion')
 
-                es_cestaticket = (tipo_personal == 'cestaticket')
-                periodicidad = 'mensual' if es_cestaticket else 'quincenal'
+                # Obtener la regla configurada en BD para este tipo de nómina
+                cursor.execute("SELECT * FROM tipo_nomina WHERE codigo = %s;", (tipo_personal,))
+                regla_tipo = cursor.fetchone()
 
-                if es_cestaticket:
+                if not regla_tipo:
+                    flash('El tipo de nómina seleccionado no está configurado en el sistema.', 'danger')
+                    return redirect(url_for('nomina.historial'))
+
+                aplica_a_todos = bool(regla_tipo['aplica_a_todos'])
+                aplica_leyes_sociales = bool(regla_tipo['aplica_leyes_sociales'])
+                periodicidad = regla_tipo['periodicidad']
+                es_cestaticket = (tipo_personal == 'cestaticket')
+
+                # Convocatoria de trabajadores según la regla
+                if aplica_a_todos:
                     sql_trabajadores = """
                         SELECT trabajador_id, cedula, nombres, apellidos, sueldo_base, 
                                hijos, nivel_instruccion, tipo_personal 
@@ -148,19 +197,19 @@ def generar():
                 plantilla = cursor.fetchall()
 
                 if not plantilla:
-                    flash(f'No hay trabajadores activos registrados en la nómina: {tipo_personal}', 'warning')
+                    flash(f"No hay funcionarios activos adscritos a la nómina: {regla_tipo['nombre']}", 'warning')
                     return redirect(url_for('nomina.historial'))
 
                 cursor.execute("SELECT * FROM concepto WHERE activo = true;")
                 conceptos = cursor.fetchall()
 
                 resultados = []
-                gran_total_asig = 0
-                gran_total_ded = 0
-                gran_total_neto = 0
+                gran_total_asig = Decimal('0.00')
+                gran_total_ded = Decimal('0.00')
+                gran_total_neto = Decimal('0.00')
 
                 sql_ind = """
-                    SELECT ct.valor, c.* FROM concepto_trabajador ct 
+                    SELECT c.*, ct.valor AS valor_individual FROM concepto_trabajador ct 
                     JOIN concepto c ON ct.concepto_id = c.concepto_id 
                     WHERE ct.trabajador_id = %s AND ct.activo = true 
                     AND (ct.fecha_fin IS NULL OR ct.fecha_fin >= CURDATE());
@@ -169,19 +218,23 @@ def generar():
                 for trab in plantilla:
                     cursor.execute(sql_ind, (trab['trabajador_id'],))
                     conceptos_individuales = cursor.fetchall()
-
+                    
+                    for ci in conceptos_individuales:
+                        ci['valor'] = ci['valor_individual']
+                        
                     calc = calcular_quincena_trabajador(
                         trab, 
                         conceptos, 
                         conceptos_individuales, 
-                        solo_cestaticket=es_cestaticket
+                        solo_cestaticket=es_cestaticket,
+                        aplica_leyes_sociales=aplica_leyes_sociales
                     )
                     resultados.append(calc)
                     gran_total_asig += calc['total_asignaciones']
                     gran_total_ded += calc['total_deducciones']
                     gran_total_neto += calc['neto_pagar']
 
-                # Guardado directo del periodo
+                # Registro de cabecera del periodo
                 sql_periodo = """
                     INSERT INTO periodo_nomina (
                         descripcion, tipo_nomina, periodicidad, fecha_inicio, fecha_fin, 
@@ -196,6 +249,7 @@ def generar():
                 ))
                 periodo_id = cursor.lastrowid
 
+                # Registro de trabajadores y detalles en lote
                 for r in resultados:
                     sql_nt = """
                         INSERT INTO nomina_trabajador (
@@ -236,8 +290,74 @@ def generar():
 
     return redirect(url_for('nomina.historial'))
 
+
 # -------------------------------------------------------------------------
-# VALIDAR NÓMINA (Directora de RRHH pasa a estado revisada)
+# DETALLE DEL PERIODO DE NÓMINA
+# -------------------------------------------------------------------------
+@nomina_bp.route('/detalle/<int:periodo_id>')
+def detalle(periodo_id):
+    if 'usuario_id' not in session:
+        return redirect(url_for('auth.login'))
+
+    roles_permitidos = ['analista_rrhh', 'directora_rrhh', 'tecnico_informatica']
+    if session.get('rol') not in roles_permitidos:
+        flash('Acceso denegado.', 'danger')
+        return redirect(url_for('auth.dashboard'))
+
+    conexion = get_db_connection()
+    try:
+        with conexion.cursor() as cursor:
+            sql_p = """
+                SELECT p.*, 
+                       u1.nombre_usuario AS analista_nom,
+                       u2.nombre_usuario AS directora_nom,
+                       u3.nombre_usuario AS presidente_nom,
+                       tn.nombre AS tipo_nomina_nombre
+                FROM periodo_nomina p
+                LEFT JOIN usuario u1 ON p.elaborada_por = u1.usuario_id
+                LEFT JOIN usuario u2 ON p.revisada_por = u2.usuario_id
+                LEFT JOIN usuario u3 ON p.aprobada_por = u3.usuario_id
+                LEFT JOIN tipo_nomina tn ON p.tipo_nomina = tn.codigo
+                WHERE p.periodo_id = %s;
+            """
+            cursor.execute(sql_p, (periodo_id,))
+            periodo = cursor.fetchone()
+
+            if not periodo:
+                flash('El periodo solicitado no existe.', 'warning')
+                return redirect(url_for('nomina.historial'))
+
+            sql_trab = """
+                SELECT nt.*, t.cedula, t.nombres, t.apellidos, t.banco, t.numero_cuenta, 
+                       t.fecha_ingreso, t.sueldo_base, c.nombre AS cargo_nombre,
+                       d.nombre AS departamento_nombre
+                FROM nomina_trabajador nt
+                INNER JOIN trabajador t ON nt.trabajador_id = t.trabajador_id
+                INNER JOIN cargo c ON t.cargo_id = c.cargo_id
+                LEFT JOIN departamento d ON c.departamento_id = d.departamento_id
+                WHERE nt.periodo_id = %s
+                ORDER BY t.apellidos ASC, t.nombres ASC;
+            """
+            cursor.execute(sql_trab, (periodo_id,))
+            trabajadores = cursor.fetchall()
+
+            for trab in trabajadores:
+                sql_det = """
+                    SELECT codigo_concepto, descripcion, tipo, monto 
+                    FROM nomina_detalle 
+                    WHERE nomina_trabajador_id = %s
+                    ORDER BY tipo ASC, monto DESC;
+                """
+                cursor.execute(sql_det, (trab['nomina_trabajador_id'],))
+                trab['desglose'] = cursor.fetchall()
+
+            return render_template('nomina/nomina_detalle.html', periodo=periodo, trabajadores=trabajadores)
+    finally:
+        conexion.close()
+
+
+# -------------------------------------------------------------------------
+# VALIDAR NÓMINA (Directora)
 # -------------------------------------------------------------------------
 @nomina_bp.route('/revisar/<int:periodo_id>', methods=['POST'])
 def revisar(periodo_id):
@@ -261,7 +381,7 @@ def revisar(periodo_id):
                 """
                 cursor.execute(sql, (session['usuario_id'], ahora, periodo_id))
                 conexion.commit()
-                flash(f'Periodo #{periodo_id} VALIDADO. Listo para impresión de sábana y visto bueno de Presidencia.', 'success')
+                flash(f'Periodo #{periodo_id} VALIDADO. Listo para firma de Presidencia.', 'success')
 
             elif accion == 'rechazar':
                 sql = """
@@ -278,12 +398,12 @@ def revisar(periodo_id):
 
     return redirect(url_for('nomina.detalle', periodo_id=periodo_id))
 
+
 # -------------------------------------------------------------------------
-# APROBAR NÓMINA (Directora registra visto bueno físico de Presidencia)
+# APROBAR NÓMINA (Conformidad Física)
 # -------------------------------------------------------------------------
 @nomina_bp.route('/aprobar/<int:periodo_id>', methods=['POST'])
 def aprobar(periodo_id):
-    # Autorizada a la Directora de RRHH
     if 'usuario_id' not in session or session.get('rol') not in ['directora_rrhh', 'presidente']:
         flash('Acceso restringido para registrar la aprobación oficial.', 'danger')
         return redirect(url_for('nomina.historial'))
@@ -304,7 +424,7 @@ def aprobar(periodo_id):
                 """
                 cursor.execute(sql, (session['usuario_id'], ahora, periodo_id))
                 conexion.commit()
-                flash(f'Periodo #{periodo_id} APROBADO oficialmente. Conformidad de Presidencia registrada.', 'success')
+                flash(f'Periodo #{periodo_id} APROBADO oficialmente.', 'success')
 
             elif accion == 'devolver':
                 sql = """
@@ -321,8 +441,9 @@ def aprobar(periodo_id):
 
     return redirect(url_for('nomina.detalle', periodo_id=periodo_id))
 
+
 # -------------------------------------------------------------------------
-# ELIMINAR PRE-NÓMINA (Solo borradores o rechazadas)
+# ELIMINAR PRE-NÓMINA
 # -------------------------------------------------------------------------
 @nomina_bp.route('/eliminar/<int:periodo_id>', methods=['POST'])
 def eliminar(periodo_id):
@@ -364,8 +485,9 @@ def eliminar(periodo_id):
 
     return redirect(url_for('nomina.historial'))
 
+
 # -------------------------------------------------------------------------
-# RECIBO INDIVIDUAL DE UN TRABAJADOR (Vista Directa para RRHH)
+# RECIBOS INDIVIDUALES Y EN LOTE
 # -------------------------------------------------------------------------
 @nomina_bp.route('/recibo/<int:nomina_trabajador_id>')
 def recibo_individual(nomina_trabajador_id):
@@ -420,9 +542,7 @@ def recibo_individual(nomina_trabajador_id):
     finally:
         conexion.close()
 
-# -------------------------------------------------------------------------
-# IMPRESIÓN MASIVA DE TODOS LOS RECIBOS INDIVIDUALES EN LOTE
-# -------------------------------------------------------------------------
+
 @nomina_bp.route('/recibos-lote/<int:periodo_id>')
 def recibos_lote(periodo_id):
     roles_permitidos = ['directora_rrhh', 'analista_rrhh', 'tecnico_informatica']
@@ -477,8 +597,9 @@ def recibos_lote(periodo_id):
     finally:
         conexion.close()
 
+
 # -------------------------------------------------------------------------
-# SÁBANA CONSOLIDADA E INFORME OFICIAL
+# SÁBANA CONSOLIDADA (Título Dinámico desde tipo_nomina)
 # -------------------------------------------------------------------------
 @nomina_bp.route('/reporte-consolidado/<int:periodo_id>')
 def reporte_consolidado(periodo_id):
@@ -497,11 +618,13 @@ def reporte_consolidado(periodo_id):
                 SELECT p.*, 
                        u1.nombre_usuario AS analista_nom,
                        u2.nombre_usuario AS directora_nom,
-                       u3.nombre_usuario AS presidente_nom
+                       u3.nombre_usuario AS presidente_nom,
+                       tn.nombre AS tipo_nomina_nombre
                 FROM periodo_nomina p
                 LEFT JOIN usuario u1 ON p.elaborada_por = u1.usuario_id
                 LEFT JOIN usuario u2 ON p.revisada_por = u2.usuario_id
                 LEFT JOIN usuario u3 ON p.aprobada_por = u3.usuario_id
+                LEFT JOIN tipo_nomina tn ON p.tipo_nomina = tn.codigo
                 WHERE p.periodo_id = %s;
             """
             cursor.execute(sql_p, (periodo_id,))
@@ -617,16 +740,8 @@ def reporte_consolidado(periodo_id):
                 totales['total_asignaciones'] += Decimal(str(t['total_asignaciones']))
                 totales['neto_pagar'] += neto
 
-            mapa_nombres = {
-                'alto_nivel': 'NÓMINA DE ALTO NIVEL (CONCEJALES Y DIRECTIVOS)',
-                'libre_remocion': 'NÓMINA DE LIBRE NOMBRAMIENTO Y REMOCIÓN',
-                'empleado_fijo': 'NÓMINA DE EMPLEADOS FIJOS (ORDINARIA)',
-                'empleado_contratado': 'NÓMINA DE EMPLEADOS CONTRATADOS',
-                'obrero_fijo': 'NÓMINA DE OBREROS FIJOS',
-                'obrero_contratado': 'NÓMINA DE OBREROS CONTRATADOS ORDINARIA',
-                'cestaticket': 'NÓMINA ESPECIAL DE BONO DE ALIMENTACIÓN CESTATICKET SOCIALISTA'
-            }
-            titulo_nomina = mapa_nombres.get(periodo['tipo_nomina'], periodo['tipo_nomina'].upper())
+            # Título 100% dinámico desde la tabla de tipo_nomina
+            titulo_nomina = (periodo.get('tipo_nomina_nombre') or periodo['tipo_nomina']).upper()
 
             return render_template(
                 'nomina/nomina_consolidada.html',
@@ -638,6 +753,7 @@ def reporte_consolidado(periodo_id):
             )
     finally:
         conexion.close()
+
 
 # -------------------------------------------------------------------------
 # EXPORTACIÓN A PATRIA TXT

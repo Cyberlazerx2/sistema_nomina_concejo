@@ -407,3 +407,60 @@ def procesar_constancia(constancia_id):
         conexion.close()
 
     return redirect(url_for('trabajadores.constancias_admin'))
+
+# -------------------------------------------------------------------------
+# RRHH: Bandeja de Permisos y Conformidad de Firmas Físicas
+# -------------------------------------------------------------------------
+@trabajadores_bp.route('/permisos-admin')
+def permisos_admin():
+    if 'usuario_id' not in session or session.get('rol') not in ['directora_rrhh', 'analista_rrhh']:
+        flash('Acceso denegado.', 'danger')
+        return redirect(url_for('auth.dashboard'))
+
+    conexion = get_db_connection()
+    try:
+        with conexion.cursor() as cursor:
+            sql = """
+                SELECT sp.*, t.cedula, t.nombres, t.apellidos,
+                       c.nombre AS cargo_nombre, d.nombre AS departamento_nombre
+                FROM solicitud_permiso sp
+                INNER JOIN trabajador t ON sp.trabajador_id = t.trabajador_id
+                INNER JOIN cargo c ON t.cargo_id = c.cargo_id
+                LEFT JOIN departamento d ON c.departamento_id = d.departamento_id
+                ORDER BY sp.permiso_id DESC;
+            """
+            cursor.execute(sql)
+            permisos = cursor.fetchall()
+            return render_template('trabajadores/trabajadores_permisos.html', permisos=permisos)
+    finally:
+        conexion.close()
+
+# -------------------------------------------------------------------------
+# RRHH: Registrar Recepción Física de Boleta y Firma de Presidencia / Supervisor
+# -------------------------------------------------------------------------
+@trabajadores_bp.route('/permisos-admin/<int:permiso_id>/procesar-fisico', methods=['POST'])
+def procesar_permiso_fisico(permiso_id):
+    if 'usuario_id' not in session or session.get('rol') not in ['directora_rrhh', 'analista_rrhh']:
+        return redirect(url_for('auth.dashboard'))
+
+    decision = request.form.get('decision') # 'concedido' o 'negado'
+    observaciones = request.form.get('observaciones', '').strip()
+
+    conexion = get_db_connection()
+    try:
+        with conexion.cursor() as cursor:
+            estado_final = 'consignado_aprobado' if decision == 'concedido' else 'negado'
+            concedido_val = 1 if decision == 'concedido' else 0
+
+            cursor.execute("""
+                UPDATE solicitud_permiso
+                SET estado = %s, concedido = %s, observaciones = %s,
+                    fecha_aprobacion_fisica = NOW(), procesado_por = %s
+                WHERE permiso_id = %s;
+            """, (estado_final, concedido_val, observaciones, session['usuario_id'], permiso_id))
+            conexion.commit()
+            flash(f'Permiso #{permiso_id} procesado con conformidad física registrada.', 'success')
+    finally:
+        conexion.close()
+
+    return redirect(url_for('trabajadores.permisos_admin'))

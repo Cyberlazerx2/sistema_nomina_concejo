@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}Control de Permisos Laborales - RRHH{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none mb-4">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="text-muted small text-uppercase fw-bold">Dirección de Talento Humano</div>
+            <h2 class="page-title text-dark">
+                Control de Permisos y Licencias
+            </h2>
+            <div class="text-muted mt-1">
+                Concejo Municipal de Independencia · Registro de conformidad física, firmas de supervisores y justificaciones.
+            </div>
+        </div>
+        <div class="col-auto ms-auto d-flex gap-2">
+            <a href="{{ url_for('trabajadores.listar') }}" class="btn btn-outline-secondary">
+                ← Volver al Directorio
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-light py-3 d-flex justify-content-between align-items-center">
+        <h3 class="card-title text-dark mb-0">Permisos Registrados</h3>
+        <span class="badge bg-blue-lt">{{ permisos|length }} trámites</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-hover">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Funcionario</th>
+                    <th>Departamento</th>
+                    <th>Tipo Permiso</th>
+                    <th>Lapso</th>
+                    <th>Estatus Físico</th>
+                    <th class="w-1 text-center">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in permisos %}
+                <tr>
+                    <td class="font-monospace small text-muted">
+                        {{ p.fecha_solicitud.strftime('%d/%m/%Y') if p.fecha_solicitud and p.fecha_solicitud.strftime is defined else p.fecha_solicitud }}
+                    </td>
+                    <td>
+                        <div class="fw-bold text-dark">{{ p.nombres }} {{ p.apellidos }}</div>
+                        <div class="text-muted small font-monospace">V-{{ p.cedula }} · {{ p.cargo_nombre }}</div>
+                    </td>
+                    <td><span class="badge bg-light text-muted border">{{ p.departamento_nombre or 'Sin adscripción' }}</span></td>
+                    <td><span class="badge bg-secondary-lt text-uppercase">{{ p.tipo_permiso|replace('_', ' ') }}</span></td>
+                    <td>
+                        <div class="fw-bold text-dark small">{{ p.duracion }}</div>
+                        <div class="text-muted font-monospace" style="font-size: 10px;">{{ p.fecha_inicio }} al {{ p.fecha_fin }}</div>
+                    </td>
+                    <td>
+                        {% if p.estado == 'solicitado' %}
+                            <span class="badge bg-warning-lt text-uppercase"><span class="badge-dot bg-warning me-1"></span>Pendiente Firma Física</span>
+                        {% elif p.estado == 'consignado_aprobado' %}
+                            <span class="badge bg-success-lt text-uppercase"><span class="badge-dot bg-success me-1"></span>Concedido en Físico</span>
+                        {% elif p.estado == 'negado' %}
+                            <span class="badge bg-danger-lt text-uppercase"><span class="badge-dot bg-danger me-1"></span>Negado</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <div class="d-flex gap-1 justify-content-center">
+                            <!-- Ver Boleta Oficial -->
+                            {% if p.tipo_permiso == 'pre_postnatal' %}
+                            <a href="{{ url_for('portal.imprimir_maternidad', permiso_id=p.permiso_id) }}" target="_blank" class="btn btn-sm btn-outline-dark" title="Ver Carta de Maternidad">
+                                📄 Carta
+                            </a>
+                            {% else %}
+                            <a href="{{ url_for('portal.imprimir_boleta_permiso', permiso_id=p.permiso_id) }}" target="_blank" class="btn btn-sm btn-outline-primary" title="Ver Boleta Oficial">
+                                🖨️ Boleta
+                            </a>
+                            {% endif %}
+
+                            <!-- Registrar Conformidad Física de la Boleta -->
+                            {% if p.estado == 'solicitado' %}
+                            <button type="button" class="btn btn-sm btn-success fw-bold" data-bs-toggle="modal" data-bs-target="#modalProcesar{{ p.permiso_id }}" title="Registrar recepción física">
+                                ✓ Validar Físico
+                            </button>
+
+                            <!-- Modal de Registro Físico -->
+                            <div class="modal modal-blur fade" id="modalProcesar{{ p.permiso_id }}" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered text-start">
+                                    <form method="POST" action="{{ url_for('trabajadores.procesar_permiso_fisico', permiso_id=p.permiso_id) }}" class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title fw-bold">Conformidad Física de Permiso #{{ p.permiso_id }}</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <p class="text-muted small">
+                                                Registre la decisión una vez consignada en físico la boleta con la firma del funcionario y su supervisor inmediato:
+                                            </p>
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold">Decisión Institucional:</label>
+                                                <select name="decision" class="form-select" required>
+                                                    <option value="concedido" selected>Concedido (Firmado conforme por Supervisor)</option>
+                                                    <option value="negado">Negado (No autorizado por necesidad de servicio)</option>
+                                                </select>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold">Observaciones de Talento Humano:</label>
+                                                <textarea name="observaciones" rows="2" class="form-control" placeholder="Anotaciones para el expediente laboral..."></textarea>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                            <button type="submit" class="btn btn-primary fw-bold">Asentar en Expediente</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">No hay solicitudes de permiso registradas.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

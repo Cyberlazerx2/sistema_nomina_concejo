@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Solicitud de Permiso - Concejo Municipal</title>
+    <style>
+        @page { size: letter portrait; margin: 10mm; }
+        body { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; margin: 0; padding: 10px; color: #000; background: #fff; }
+        .boleta-permiso { border: 1px dashed #666; padding: 12px 18px; margin-bottom: 15px; box-sizing: border-box; min-height: 128mm; }
+        .encabezado { text-align: center; font-weight: bold; font-size: 9pt; line-height: 1.2; text-transform: uppercase; margin-bottom: 8px; }
+        .titulo-doc { text-align: center; font-weight: bold; font-size: 13pt; margin-bottom: 8px; text-transform: uppercase; }
+        .fecha-linea { text-align: right; margin-bottom: 8px; font-size: 10pt; }
+        .campo-fila { margin-bottom: 6px; line-height: 1.4; }
+        .subrayado { border-bottom: 1px solid #000; display: inline-block; min-width: 250px; font-weight: bold; padding-left: 4px; }
+        .cuadro-check { display: inline-block; width: 14px; height: 14px; border: 1px solid #000; vertical-align: middle; text-align: center; line-height: 12px; font-weight: bold; }
+        .seccion-firmas { margin-top: 18px; display: flex; justify-content: space-between; }
+        .bloque-firma { width: 45%; text-align: center; font-size: 8.5pt; border-top: 1px solid #000; padding-top: 4px; }
+        .btn-imprimir { position: fixed; top: 15px; right: 15px; background: #0f172a; color: #fff; padding: 10px 18px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        @media print { .btn-imprimir { display: none !important; } }
+    </style>
+</head>
+<body>
+
+<button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir Boleta (Duplicado)</button>
+
+<!-- COPIA 1: ARCHIVO TALENTO HUMANO -->
+<div class="boleta-permiso">
+    <div class="encabezado">
+        REPÚBLICA BOLIVARIANA DE VENEZUELA<br>
+        ESTADO YARACUY<br>
+        CONCEJO MUNICIPAL DE INDEPENDENCIA<br>
+        DIRECCION DE RECURSOS HUMANOS<br>
+        RIF: G-200060557
+    </div>
+
+    <div class="titulo-doc">Solicitud de permiso</div>
+    <div class="fecha-linea">San Felipe; {{ hoy.strftime('%d / %m / %Y') }}</div>
+
+    <div class="campo-fila">
+        Nombre del Empleado: <span class="subrayado" style="min-width: 530px;">{{ p.nombres|upper }} {{ p.apellidos|upper }}</span>
+    </div>
+    <div class="campo-fila">
+        CI: <span class="subrayado" style="min-width: 160px;">V-{{ p.cedula }}</span>
+        Departamento: <span class="subrayado" style="min-width: 330px;">{{ (p.departamento_nombre or 'Sin adscripción')|upper }}</span>
+    </div>
+    <div class="campo-fila">
+        Cargo: <span class="subrayado" style="min-width: 630px;">{{ p.cargo_nombre|upper }}</span>
+    </div>
+    <div class="campo-fila">
+        Duración: <span class="subrayado" style="min-width: 280px;">{{ p.duracion }} (Desde: {{ p.fecha_inicio }} Hasta: {{ p.fecha_fin }})</span>
+        Concedido: <span class="cuadro-check">{% if p.concedido == 1 %}✓{% endif %}</span>&nbsp;&nbsp;&nbsp;&nbsp;
+        Negado: <span class="cuadro-check">{% if p.concedido == 0 %}✓{% endif %}</span>
+    </div>
+    <div class="campo-fila">
+        Motivo: <span class="subrayado" style="min-width: 630px;">{{ p.motivo }}</span>
+    </div>
+    <div class="campo-fila">
+        Observaciones: <span class="subrayado" style="min-width: 585px;">{{ p.observaciones or 'Trámite consignado ante Talento Humano.' }}</span>
+    </div>
+
+    <div class="seccion-firmas">
+        <div class="bloque-firma">
+            Firma del Empleado<br>
+            C.I. V-{{ p.cedula }}
+        </div>
+        <div class="bloque-firma">
+            Firma del jefe inmediato o Supervisor<br>
+            Visto Bueno / Sello
+        </div>
+    </div>
+</div>
+
+<!-- COPIA 2: COMPROBANTE PARA EL FUNCIONARIO -->
+<div class="boleta-permiso">
+    <div class="encabezado">
+        REPÚBLICA BOLIVARIANA DE VENEZUELA<br>
+        ESTADO YARACUY<br>
+        CONCEJO MUNICIPAL DE INDEPENDENCIA<br>
+        DIRECCION DE RECURSOS HUMANOS<br>
+        RIF: G-200060557
+    </div>
+
+    <div class="titulo-doc">Solicitud de permiso (Copia Empleado)</div>
+    <div class="fecha-linea">San Felipe; {{ hoy.strftime('%d / %m / %Y') }}</div>
+
+    <div class="campo-fila">
+        Nombre del Empleado: <span class="subrayado" style="min-width: 530px;">{{ p.nombres|upper }} {{ p.apellidos|upper }}</span>
+    </div>
+    <div class="campo-fila">
+        CI: <span class="subrayado" style="min-width: 160px;">V-{{ p.cedula }}</span>
+        Departamento: <span class="subrayado" style="min-width: 330px;">{{ (p.departamento_nombre or 'Sin adscripción')|upper }}</span>
+    </div>
+    <div class="campo-fila">
+        Cargo: <span class="subrayado" style="min-width: 630px;">{{ p.cargo_nombre|upper }}</span>
+    </div>
+    <div class="campo-fila">
+        Duración: <span class="subrayado" style="min-width: 280px;">{{ p.duracion }}</span>
+        Concedido: <span class="cuadro-check">{% if p.concedido == 1 %}✓{% endif %}</span>&nbsp;&nbsp;&nbsp;&nbsp;
+        Negado: <span class="cuadro-check">{% if p.concedido == 0 %}✓{% endif %}</span>
+    </div>
+    <div class="campo-fila">
+        Motivo: <span class="subrayado" style="min-width: 630px;">{{ p.motivo }}</span>
+    </div>
+    <div class="campo-fila">
+        Observaciones: <span class="subrayado" style="min-width: 585px;">{{ p.observaciones or 'Constancia de entrega en RRHH.' }}</span>
+    </div>
+
+    <div class="seccion-firmas">
+        <div class="bloque-firma">
+            Firma del Empleado<br>
+            C.I. V-{{ p.cedula }}
+        </div>
+        <div class="bloque-firma">
+            Firma del jefe inmediato o Supervisor<br>
+            Visto Bueno / Sello
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

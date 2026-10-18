@@ -5,10 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
     <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
     <title>{% block title %}Concejo Municipal de Independencia{% endblock %} - Sistema de Nómina</title>
-    <!-- Estilos locales de Tabler (Sin CDNs externas) -->
+    <!-- Estilos locales de Tabler -->
     <link href="{{ url_for('static', filename='css/tabler.min.css') }}" rel="stylesheet"/>
     <style>
-        /* Personalización institucional */
         :root {
             --tblr-primary: #1e3a8a;
             --tblr-primary-rgb: 30, 58, 138;
@@ -18,12 +17,31 @@
         }
         .navbar-vertical .navbar-brand, 
         .navbar-vertical .nav-link {
-            color: #e2e8f0;
+            color: #cbd5e1;
+            font-size: 0.88rem;
+            padding: 0.55rem 0.85rem;
+            border-radius: 6px;
+            margin: 0.1rem 0.5rem;
+            transition: all 0.15s ease-in-out;
         }
-        .navbar-vertical .nav-link.active,
         .navbar-vertical .nav-link:hover {
             color: #ffffff;
             background: rgba(255, 255, 255, 0.08);
+        }
+        .navbar-vertical .nav-link.active {
+            color: #ffffff;
+            font-weight: 600;
+            background: rgba(30, 58, 138, 0.6);
+            border-left: 3px solid #38bdf8;
+        }
+        .nav-section-label {
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #64748b;
+            font-weight: 700;
+            padding: 0.85rem 1.25rem 0.25rem 1.25rem;
+            margin-top: 0.35rem;
         }
         .badge-borrador { background-color: #f59e0b; color: white; }
         .badge-revisada { background-color: #0284c7; color: white; }
@@ -47,167 +65,290 @@
                 </div>
 
                 <div class="collapse navbar-collapse" id="sidebar-menu">
-                    <ul class="navbar-nav pt-lg-3">
+                    <ul class="navbar-nav pt-lg-2">
+                        
+                        <!-- ========================================================= -->
+                        <!-- ROL: DIRECTORA DE RRHH -->
+                        <!-- ========================================================= -->
+                        {% if session.get('rol') == 'directora_rrhh' %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('auth.dashboard') }}">
-                                <span class="nav-link-icon d-md-none d-lg-inline-block">🏠</span>
-                                <span class="nav-link-title">Inicio / Panel</span>
-                            </a>
-                        </li>
-
-                        <!-- Opciones: Analista de RRHH -->
-                        {% if session.get('rol') == 'analista_rrhh' %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('asistencia.listar') }}">
-                                <span class="nav-link-icon d-md-none d-lg-inline-block">📅</span>
-                                <span class="nav-link-title">Control de Asistencia</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('nomina.generar') }}">
-                                <span class="nav-link-icon d-md-none d-lg-inline-block">📋</span>
-                                <span class="nav-link-title">Elaborar Nómina</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('trabajadores.constancias_admin') }}">
+                            <a class="nav-link {% if request.endpoint == 'auth.dashboard' %}active{% endif %}" href="{{ url_for('auth.dashboard') }}">
                                 <span class="nav-link-icon d-md-none d-lg-inline-block">
-                                    <!-- Icono de certificación / medalla -->
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="12" cy="9" r="6" /><polyline points="9 14.2 9 21 12 19 15 21 15 14.2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" /></svg>
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><polyline points="5 12 3 12 12 3 21 12 19 12" /><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" /><path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" /></svg>
                                 </span>
-                                <span class="nav-link-title">Constancias de Trabajo</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('trabajadores.listar') }}">
-                                <span class="nav-link-icon d-md-none d-lg-inline-block">👥</span>
-                                <span class="nav-link-title">Plantilla de Personal</span>
+                                <span class="nav-link-title">Inicio / Resumen</span>
                             </a>
                         </li>
 
-                        <!-- Opciones: Directora de RRHH -->
-                        {% elif session.get('rol') == 'directora_rrhh' %}
+                        <div class="nav-section-label">Gestión de Nómina</div>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('nomina.historial') }}">
-                                <span class="nav-link-icon d-md-none d-lg-inline-block">🔍</span>
+                            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('nomina.') %}active{% endif %}" href="{{ url_for('nomina.historial') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><rect x="7" y="3" width="14" height="14" rx="2" /><path d="M17 17v2a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2h2" /></svg>
+                                </span>
                                 <span class="nav-link-title">Revisión de Nóminas</span>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('trabajadores.listar') }}">
-                                <span class="nav-link-icon d-md-none d-lg-inline-block">👥</span>
-                                <span class="nav-link-title">Gestión de Personal</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('trabajadores.solicitudes') }}">
-                                <span class="nav-link-icon d-md-none d-lg-inline-block">📬</span>
-                                <span class="nav-link-title">Solicitudes de Perfil</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('asistencia.listar') }}">
-                                <span class="nav-link-icon d-md-none d-lg-inline-block">📅</span>
+                            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('asistencia.') %}active{% endif %}" href="{{ url_for('asistencia.listar') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><rect x="4" y="5" width="16" height="16" rx="2" /><line x1="16" y1="3" x2="16" y2="7" /><line x1="8" y1="3" x2="8" y2="7" /><line x1="4" y1="11" x2="20" y2="11" /><rect x="8" y="15" width="2" height="2" /></svg>
+                                </span>
                                 <span class="nav-link-title">Supervisión Asistencia</span>
                             </a>
                         </li>
+
+                        <div class="nav-section-label">Personal y Estructura</div>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('trabajadores.constancias_admin') }}">
+                            <a class="nav-link {% if request.endpoint in ['trabajadores.listar', 'trabajadores.nuevo', 'trabajadores.editar'] %}active{% endif %}" href="{{ url_for('trabajadores.listar') }}">
                                 <span class="nav-link-icon d-md-none d-lg-inline-block">
-                                    <!-- Icono de certificación / medalla -->
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="9" cy="7" r="4" /><path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /><path d="M21 21v-2a4 4 0 0 0 -3 -3.85" /></svg>
+                                </span>
+                                <span class="nav-link-title">Directorio de Personal</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('organizacion.') %}active{% endif %}" href="{{ url_for('organizacion.cargos') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><line x1="3" y1="21" x2="21" y2="21" /><line x1="9" y1="8" x2="10" y2="8" /><line x1="9" y1="12" x2="10" y2="12" /><line x1="9" y1="16" x2="10" y2="16" /><line x1="14" y1="8" x2="15" y2="8" /><line x1="14" y1="12" x2="15" y2="12" /><line x1="14" y1="16" x2="15" y2="16" /><path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16" /></svg>
+                                </span>
+                                <span class="nav-link-title">Cargos y Dependencias</span>
+                            </a>
+                        </li>
+
+                        <div class="nav-section-label">Ventanilla de Trámites</div>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'trabajadores.constancias_admin' %}active{% endif %}" href="{{ url_for('trabajadores.constancias_admin') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="12" cy="9" r="6" /><polyline points="9 14.2 9 21 12 19 15 21 15 14.2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" /></svg>
                                 </span>
                                 <span class="nav-link-title">Constancias de Trabajo</span>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('config.conceptos') }}">
-                                <span class="nav-link-icon d-md-none d-lg-inline-block">⚙️</span>
-                                <span class="nav-link-title">Conceptos Salariales</span>
+                            <a class="nav-link {% if request.endpoint == 'trabajadores.permisos_admin' %}active{% endif %}" href="{{ url_for('trabajadores.permisos_admin') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2" /><rect x="9" y="3" width="6" height="4" rx="2" /><path d="M9 14l2 2l4 -4" /></svg>
+                                </span>
+                                <span class="nav-link-title">Control de Permisos</span>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('organizacion.cargos') }}">
-                                <span class="nav-link-icon d-md-none d-lg-inline-block">🏢</span>
-                                <span class="nav-link-title">Cargos y Departamentos</span>
+                            <a class="nav-link {% if request.endpoint == 'trabajadores.solicitudes' %}active{% endif %}" href="{{ url_for('trabajadores.solicitudes') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 21v-13a3 3 0 0 1 3 -3h10a3 3 0 0 1 3 3v6a3 3 0 0 1 -3 3h-9l-4 4" /><line x1="8" y1="9" x2="16" y2="9" /><line x1="8" y1="13" x2="14" y2="13" /></svg>
+                                </span>
+                                <span class="nav-link-title">Solicitudes de Perfil</span>
                             </a>
                         </li>
 
-                        <!-- Opciones: Presidente del Concejo -->
-                        {% elif session.get('rol') == 'presidente' %}
+                        <div class="nav-section-label">Configuración Salarial</div>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('nomina.historial') }}">
-                                <span class="nav-link-icon d-md-none d-lg-inline-block">🔒</span>
-                                <span class="nav-link-title">Aprobación de Nómina</span>
+                            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('config.') %}active{% endif %}" href="{{ url_for('config.conceptos') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" /><circle cx="12" cy="12" r="3" /></svg>
+                                </span>
+                                <span class="nav-link-title">Parametrizar Conceptos</span>
+                            </a>
+                        </li>
+
+                        <!-- ========================================================= -->
+                        <!-- ROL: ANALISTA DE RRHH -->
+                        <!-- ========================================================= -->
+                        {% elif session.get('rol') == 'analista_rrhh' %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'auth.dashboard' %}active{% endif %}" href="{{ url_for('auth.dashboard') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><polyline points="5 12 3 12 12 3 21 12 19 12" /><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" /><path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" /></svg>
+                                </span>
+                                <span class="nav-link-title">Inicio / Panel</span>
+                            </a>
+                        </li>
+
+                        <div class="nav-section-label">Operaciones de Nómina</div>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'nomina.generar' %}active{% endif %}" href="{{ url_for('nomina.generar') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /><line x1="12" y1="11" x2="12" y2="17" /><line x1="9" y1="14" x2="15" y2="14" /></svg>
+                                </span>
+                                <span class="nav-link-title">Elaborar Pre-Nómina</span>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('trabajadores.listar') }}">
-                                <span class="nav-link-icon d-md-none d-lg-inline-block">👥</span>
+                            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('asistencia.') %}active{% endif %}" href="{{ url_for('asistencia.listar') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><rect x="4" y="5" width="16" height="16" rx="2" /><line x1="16" y1="3" x2="16" y2="7" /><line x1="8" y1="3" x2="8" y2="7" /><line x1="4" y1="11" x2="20" y2="11" /><rect x="8" y="15" width="2" height="2" /></svg>
+                                </span>
+                                <span class="nav-link-title">Control de Asistencia</span>
+                            </a>
+                        </li>
+
+                        <div class="nav-section-label">Personal y Trámites</div>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'trabajadores.listar' %}active{% endif %}" href="{{ url_for('trabajadores.listar') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="9" cy="7" r="4" /><path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /><path d="M21 21v-2a4 4 0 0 0 -3 -3.85" /></svg>
+                                </span>
+                                <span class="nav-link-title">Plantilla de Personal</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'trabajadores.constancias_admin' %}active{% endif %}" href="{{ url_for('trabajadores.constancias_admin') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="12" cy="9" r="6" /><polyline points="9 14.2 9 21 12 19 15 21 15 14.2" /></svg>
+                                </span>
+                                <span class="nav-link-title">Constancias de Trabajo</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'trabajadores.permisos_admin' %}active{% endif %}" href="{{ url_for('trabajadores.permisos_admin') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2" /><rect x="9" y="3" width="6" height="4" rx="2" /><path d="M9 14l2 2l4 -4" /></svg>
+                                </span>
+                                <span class="nav-link-title">Control de Permisos</span>
+                            </a>
+                        </li>
+
+                        <!-- ========================================================= -->
+                        <!-- ROL: PRESIDENTE DEL CONCEJO -->
+                        <!-- ========================================================= -->
+                        {% elif session.get('rol') == 'presidente' %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'auth.dashboard' %}active{% endif %}" href="{{ url_for('auth.dashboard') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><polyline points="5 12 3 12 12 3 21 12 19 12" /><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" /></svg>
+                                </span>
+                                <span class="nav-link-title">Despacho Presidencial</span>
+                            </a>
+                        </li>
+                        <div class="nav-section-label">Supervisión Institucional</div>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('nomina.') %}active{% endif %}" href="{{ url_for('nomina.historial') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><rect x="5" y="11" width="14" height="10" rx="2" /><circle cx="12" cy="16" r="1" /><path d="M8 11v-4a4 4 0 0 1 8 0v4" /></svg>
+                                </span>
+                                <span class="nav-link-title">Aprobación de Nóminas</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'trabajadores.listar' %}active{% endif %}" href="{{ url_for('trabajadores.listar') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="9" cy="7" r="4" /><path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" /></svg>
+                                </span>
                                 <span class="nav-link-title">Consulta de Personal</span>
                             </a>
                         </li>
 
-                        <!-- Opciones: Técnico de Informática -->
+                        <!-- ========================================================= -->
+                        <!-- ROL: TÉCNICO DE INFORMÁTICA -->
+                        <!-- ========================================================= -->
                         {% elif session.get('rol') == 'tecnico_informatica' %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('tecnico.usuarios') }}">
-                                <span class="nav-link-icon d-md-none d-lg-inline-block">👤</span>
-                                <span class="nav-link-title">Cuentas y Seguridad</span>
+                            <a class="nav-link {% if request.endpoint == 'auth.dashboard' %}active{% endif %}" href="{{ url_for('auth.dashboard') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><polyline points="5 12 3 12 12 3 21 12 19 12" /><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" /></svg>
+                                </span>
+                                <span class="nav-link-title">Panel Técnico</span>
+                            </a>
+                        </li>
+                        <div class="nav-section-label">Seguridad y Cuentas</div>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'tecnico.usuarios' %}active{% endif %}" href="{{ url_for('tecnico.usuarios') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="12" cy="7" r="4" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" /></svg>
+                                </span>
+                                <span class="nav-link-title">Cuentas y Accesos</span>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('tecnico.bitacora') }}">
-                                <span class="nav-link-icon d-md-none d-lg-inline-block">📜</span>
+                            <a class="nav-link {% if request.endpoint == 'tecnico.bitacora' %}active{% endif %}" href="{{ url_for('tecnico.bitacora') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /><line x1="9" y1="9" x2="10" y2="9" /><line x1="9" y1="13" x2="15" y2="13" /><line x1="9" y1="17" x2="15" y2="17" /></svg>
+                                </span>
                                 <span class="nav-link-title">Bitácora de Auditoría</span>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('tecnico.backup') }}">
-                                <span class="nav-link-icon d-md-none d-lg-inline-block">💾</span>
-                                <span class="nav-link-title">Respaldo SQL</span>
+                            <a class="nav-link {% if request.endpoint == 'tecnico.backup' %}active{% endif %}" href="{{ url_for('tecnico.backup') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M6 4h10l4 4v10a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2" /><circle cx="12" cy="14" r="2" /><polyline points="14 4 14 8 8 8 8 4" /></svg>
+                                </span>
+                                <span class="nav-link-title">Respaldos SQL</span>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('organizacion.cargos') }}">
-                                <span class="nav-link-icon d-md-none d-lg-inline-block">🏢</span>
+                            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('organizacion.') %}active{% endif %}" href="{{ url_for('organizacion.cargos') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><line x1="3" y1="21" x2="21" y2="21" /><path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16" /></svg>
+                                </span>
                                 <span class="nav-link-title">Estructura Orgánica</span>
                             </a>
                         </li>
 
-                        <!-- Opciones: Trabajador Regular -->
+                        <!-- ========================================================= -->
+                        <!-- ROL: TRABAJADOR / FUNCIONARIO -->
+                        <!-- ========================================================= -->
                         {% elif session.get('rol') == 'trabajador' %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('portal.recibos') }}">
-                                <span class="nav-link-icon d-md-none d-lg-inline-block">📄</span>
-                                <span class="nav-link-title">Mis Recibos de Pago</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('portal.perfil') }}">
-                                <span class="nav-link-icon d-md-none d-lg-inline-block">👤</span>
-                                <span class="nav-link-title">Mi Ficha y Contacto</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('portal.constancias') }}">
+                            <a class="nav-link {% if request.endpoint == 'portal.inicio' %}active{% endif %}" href="{{ url_for('portal.inicio') }}">
                                 <span class="nav-link-icon d-md-none d-lg-inline-block">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /><line x1="9" y1="9" x2="10" y2="9" /><line x1="9" y1="13" x2="15" y2="13" /><line x1="9" y1="17" x2="15" y2="17" /></svg>
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><polyline points="5 12 3 12 12 3 21 12 19 12" /><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" /></svg>
+                                </span>
+                                <span class="nav-link-title">Mi Expediente</span>
+                            </a>
+                        </li>
+
+                        <div class="nav-section-label">Pagos y Recibos</div>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint in ['portal.recibos', 'portal.recibo_detalle'] %}active{% endif %}" href="{{ url_for('portal.recibos') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><rect x="7" y="3" width="14" height="14" rx="2" /><path d="M17 17v2a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2h2" /></svg>
+                                </span>
+                                <span class="nav-link-title">Mis Recibos (LOTTT)</span>
+                            </a>
+                        </li>
+
+                        <div class="nav-section-label">Ventanilla de Trámites</div>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'portal.constancias' %}active{% endif %}" href="{{ url_for('portal.constancias') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="12" cy="9" r="6" /><polyline points="9 14.2 9 21 12 19 15 21 15 14.2" /></svg>
                                 </span>
                                 <span class="nav-link-title">Mis Constancias</span>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('chatbot.index') }}">
-                                <span class="nav-link-icon d-md-none d-lg-inline-block">💬</span>
+                            <a class="nav-link {% if request.endpoint == 'portal.permisos' %}active{% endif %}" href="{{ url_for('portal.permisos') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2" /><rect x="9" y="3" width="6" height="4" rx="2" /><path d="M9 14l2 2l4 -4" /></svg>
+                                </span>
+                                <span class="nav-link-title">Mis Permisos</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'portal.perfil' %}active{% endif %}" href="{{ url_for('portal.perfil') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="12" cy="7" r="4" /><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" /></svg>
+                                </span>
+                                <span class="nav-link-title">Datos y Contacto</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('chatbot.') %}active{% endif %}" href="{{ url_for('chatbot.index') }}">
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><rect x="4" y="4" width="16" height="12" rx="2" /><line x1="8" y1="9" x2="8.01" y2="9" /><line x1="12" y1="9" x2="12.01" y2="9" /><line x1="16" y1="9" x2="16.01" y2="9" /><path d="M4 14l-2 4h4" /></svg>
+                                </span>
                                 <span class="nav-link-title">Asistente Virtual</span>
                             </a>
                         </li>
                         {% endif %}
 
-                        <li class="nav-item mt-3">
+                        <!-- Cerrar Sesión General -->
+                        <li class="nav-item mt-4 pt-2 border-top border-secondary">
                             <a class="nav-link text-danger" href="{{ url_for('auth.logout') }}">
-                                <span class="nav-link-icon d-md-none d-lg-inline-block">🚪</span>
+                                <span class="nav-link-icon d-md-none d-lg-inline-block">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 8v-2a2 2 0 0 0 -2 -2h-7a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h7a2 2 0 0 0 2 -2v-2" /><path d="M7 12h14l-3 -3m0 6l3 -3" /></svg>
+                                </span>
                                 <span class="nav-link-title">Cerrar Sesión</span>
                             </a>
                         </li>
@@ -222,12 +363,12 @@
                 <div class="container-xl">
                     <div class="navbar-nav flex-row order-md-last ms-auto">
                         <div class="nav-item d-flex align-items-center">
-                            <span class="avatar avatar-sm bg-blue-lt me-2">
+                            <span class="avatar avatar-sm bg-blue-lt me-2 fw-bold">
                                 {{ (session.get('nombre_usuario') or 'U')[:2]|upper }}
                             </span>
                             <div class="d-none d-xl-block ps-1 text-start">
-                                <div class="fw-bold">{{ session.get('nombre_usuario') }}</div>
-                                <div class="small text-muted text-uppercase">{{ session.get('rol')|replace('_', ' ') }}</div>
+                                <div class="fw-bold text-dark">{{ session.get('nombre_usuario') }}</div>
+                                <div class="small text-muted text-uppercase" style="font-size: 10px;">{{ session.get('rol')|replace('_', ' ') }}</div>
                             </div>
                         </div>
                     </div>
@@ -240,7 +381,7 @@
                     {% with messages = get_flashed_messages(with_categories=true) %}
                         {% if messages %}
                             {% for category, message in messages %}
-                                <div class="alert alert-{{ 'danger' if category == 'danger' else ('warning' if category == 'warning' else 'success') }} alert-dismissible fade show" role="alert">
+                                <div class="alert alert-{{ 'danger' if category == 'danger' else ('warning' if category == 'warning' else 'success') }} alert-dismissible fade show shadow-sm" role="alert">
                                     {{ message }}
                                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                                 </div>

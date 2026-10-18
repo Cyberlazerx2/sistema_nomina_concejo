@@ -193,3 +193,48 @@ def actualizar_concepto(id):
         conexion.close()
 
     return redirect(url_for('config.conceptos'))
+
+# -------------------------------------------------------------------------
+# 3. REGISTRAR NUEVO CONCEPTO O RETENCIÓN EN EL CATÁLOGO
+# -------------------------------------------------------------------------
+@config_bp.route('/conceptos/nuevo', methods=['POST'])
+def crear_concepto():
+    if 'usuario_id' not in session or session.get('rol') not in ['directora_rrhh', 'tecnico_informatica']:
+        flash('Acceso denegado.', 'danger')
+        return redirect(url_for('config.conceptos'))
+
+    codigo = request.form.get('codigo', '').strip().upper().replace(' ', '_')
+    nombre = request.form.get('nombre', '').strip()
+    tipo = request.form.get('tipo', 'asignacion')
+    metodo = request.form.get('metodo', 'fijo')
+    valor_raw = request.form.get('valor', '0').replace(',', '.')
+    obligatorio = 1 if request.form.get('obligatorio') == '1' else 0
+
+    try:
+        valor = Decimal(valor_raw)
+    except Exception:
+        valor = Decimal('0.00')
+
+    conexion = get_db_connection()
+    try:
+        with conexion.cursor() as cursor:
+            # Validar unicidad del código
+            cursor.execute("SELECT concepto_id FROM concepto WHERE codigo = %s;", (codigo,))
+            if cursor.fetchone():
+                flash(f"El código de concepto '{codigo}' ya se encuentra registrado.", 'warning')
+                return redirect(url_for('config.conceptos'))
+
+            sql_insert = """
+                INSERT INTO concepto (codigo, nombre, tipo, metodo, valor, base_calculo, obligatorio, activo)
+                VALUES (%s, %s, %s, %s, %s, 'sueldo_base', %s, true);
+            """
+            cursor.execute(sql_insert, (codigo, nombre, tipo, metodo, valor, obligatorio))
+            conexion.commit()
+            flash(f"Concepto '{nombre}' creado e incorporado al motor de cálculo con éxito.", 'success')
+    except Exception as e:
+        conexion.rollback()
+        flash(f'Error al registrar concepto: {e}', 'danger')
+    finally:
+        conexion.close()
+
+    return redirect(url_for('config.conceptos'))

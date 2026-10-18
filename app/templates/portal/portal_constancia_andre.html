@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Constancia - {{ c.nombres }} {{ c.apellidos }}</title>
+    <style>
+        @page { size: letter; margin: 25mm 20mm 20mm 25mm; }
+        body { font-family: "Times New Roman", Times, serif; font-size: 13pt; line-height: 1.8; color: #000; margin: 0; padding: 20px; background: #fff; }
+        .titulo { text-align: center; font-weight: bold; font-size: 16pt; margin-top: 40px; margin-bottom: 40px; text-decoration: underline; letter-spacing: 1px; }
+        .cuerpo { text-align: justify; text-indent: 50px; margin-bottom: 30px; }
+        .firma-bloque { margin-top: 80px; text-align: center; font-size: 11pt; line-height: 1.3; }
+        .firma-linea { width: 260px; border-top: 1px solid #000; margin: 0 auto 6px auto; }
+        .btn-imprimir { position: fixed; top: 15px; right: 15px; background: #0f172a; color: #fff; padding: 10px 18px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        @media print { .btn-imprimir { display: none !important; } body { padding: 0; } }
+    </style>
+</head>
+<body>
+
+<button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir Constancia</button>
+
+<div class="titulo">CONSTANCIA</div>
+
+<div class="cuerpo">
+    Quien Suscribe, Director de Recursos Humanos del Concejo Municipal del Municipio Independencia, del Estado Yaracuy. Por medio de la presente hago constar que el (a) Ciudadano (a), <strong>{{ c.nombres|upper }} {{ c.apellidos|upper }}</strong> Titular de la Cédula de Identidad N° <strong>V-{{ c.cedula }}</strong>, presta sus servicios dentro de este Concejo Municipal, desde el <strong>{{ c.fecha_ingreso or '01/01/2023' }}</strong> hasta la presente fecha, desempeñando el cargo de: <strong>{{ c.cargo_nombre|upper }}</strong>{% if c.tipo == 'con_sueldo' %} devengando un Sueldo Basico de <strong>{{ sueldo_letras }} ({{ sueldo_num }} Bs.)</strong> mensual{% endif %}.
+</div>
+
+<div class="cuerpo">
+    Constancia que se expide a solicitud de parte interesada en Independencia, a los {{ dia }} días del mes de {{ mes }} del {{ ano }}.
+</div>
+
+<div class="firma-bloque">
+    Atentamente,
+    <br><br><br><br>
+    <div class="firma-linea"></div>
+    <strong>LCDA. LINDA ESPERANZA LEON</strong><br>
+    DIR. DE RR.HH DEL CONCEJO MUNICIPAL INDEPENDENCIA<br>
+    Telf 0412-7608940
+</div>
+
+</body>
+</html>

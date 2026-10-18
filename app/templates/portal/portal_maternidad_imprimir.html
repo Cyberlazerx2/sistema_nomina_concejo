@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Solicitud de Permiso Pre y Postnatal</title>
+    <style>
+        @page { size: letter; margin: 25mm; }
+        body { font-family: "Times New Roman", Times, serif; font-size: 12pt; line-height: 1.8; color: #000; padding: 20px; background: #fff; }
+        .encabezado { text-align: center; font-weight: bold; font-size: 11pt; line-height: 1.3; margin-bottom: 25px; text-transform: uppercase; border-bottom: 2px solid #000; padding-bottom: 8px; }
+        .fecha-lugar { text-align: right; margin-bottom: 25px; }
+        .destinatario { font-weight: bold; line-height: 1.4; margin-bottom: 25px; }
+        .cuerpo { text-align: justify; text-indent: 40px; margin-bottom: 20px; }
+        .firma { margin-top: 60px; text-align: center; }
+        .linea { width: 250px; border-top: 1px solid #000; margin: 0 auto 6px auto; }
+        .recibido-caja { margin-top: 40px; border: 1px solid #000; padding: 10px; width: 280px; font-size: 9pt; }
+        .btn-imprimir { position: fixed; top: 15px; right: 15px; background: #0f172a; color: #fff; padding: 10px 18px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        @media print { .btn-imprimir { display: none !important; } }
+    </style>
+</head>
+<body>
+
+<button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir Carta de Maternidad</button>
+
+<div class="encabezado">
+    REPÚBLICA BOLIVARIANA DE VENEZUELA<br>
+    ESTADO YARACUY · MUNICIPIO INDEPENDENCIA<br>
+    CONCEJO MUNICIPAL DE INDEPENDENCIA<br>
+    DIRECCIÓN DE TALENTO HUMANO
+</div>
+
+<div class="fecha-lugar">
+    San Felipe, {{ hoy.strftime('%d de %B de %Y') }}
+</div>
+
+<div class="destinatario">
+    CIUDADANA:<br>
+    LCDA. LINDA ESPERANZA LEÓN<br>
+    DIRECTORA DE TALENTO HUMANO<br>
+    CONCEJO MUNICIPAL DE INDEPENDENCIA<br>
+    SU DESPACHO.-
+</div>
+
+<div class="cuerpo">
+    Por medio de la presente, yo, <strong>{{ p.nombres|upper }} {{ p.apellidos|upper }}</strong>, titular de la Cédula de Identidad N° <strong>V-{{ p.cedula }}</strong>, en mi condición de servidora pública desempeñando el cargo de <strong>{{ p.cargo_nombre|upper }}</strong>, adscrita a <strong>{{ (p.departamento_nombre or 'Concejo Municipal')|upper }}</strong>, me dirijo a usted con el debido respeto en la oportunidad de solicitar formalmente mi <strong>PERMISO PRENATAL Y POSTNATAL</strong>, de conformidad con lo establecido en los <strong>Artículos 336 y 339 de la Ley Orgánica del Trabajo, los Trabajadores y las Trabajadoras (LOTTT)</strong>.
+</div>
+
+<div class="cuerpo">
+    El periodo de descanso legal requerido comprende un lapso de <strong>{{ p.duracion }}</strong>, haciéndose efectivo a partir del día <strong>{{ p.fecha_inicio }}</strong> hasta el <strong>{{ p.fecha_fin }}</strong>, fechas en las cuales ejerceré el derecho de maternidad y cuidado integral de mi hijo(a).
+</div>
+
+<div class="cuerpo">
+    Se anexa a la presente solicitud el correspondiente <strong>Informe Médico Obstétrico</strong> y el <strong>Certificado de Incapacidad Temporal emitido por el Instituto Venezolano de los Seguros Sociales (IVSS)</strong> que avala el estado gestacional y la fecha probable de parto.
+</div>
+
+<div class="cuerpo">
+    Agradeciendo de antemano su atención a la presente solicitud de orden legal y administrativo.
+</div>
+
+<div class="firma">
+    <div class="linea"></div>
+    <strong>{{ p.nombres|upper }} {{ p.apellidos|upper }}</strong><br>
+    C.I. V-{{ p.cedula }}<br>
+    Funcionario(a) Solicitante
+</div>
+
+<div class="recibido-caja">
+    <strong>CONSIGNADO ANTE RRHH:</strong><br>
+    Fecha Recepción: ____/____/________<br>
+    Recibido por: ________________________<br>
+    Sello Dirección Talento Humano
+</div>
+
+</body>
+</html>

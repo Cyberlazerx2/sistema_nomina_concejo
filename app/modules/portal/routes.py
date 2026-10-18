@@ -2,6 +2,7 @@ import datetime
 import uuid
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from app.database import get_db_connection
+from app.modules.portal.numero_letras import numero_a_letras
 
 portal_bp = Blueprint('portal', __name__)
 
@@ -425,45 +426,140 @@ def constancias():
 # -------------------------------------------------------------------------
 @portal_bp.route('/constancias/<int:constancia_id>/imprimir')
 def imprimir_constancia(constancia_id):
-    if 'usuario_id' not in session:
-        return redirect(url_for('auth.login'))
-
     conexion = get_db_connection()
     try:
         with conexion.cursor() as cursor:
             sql = """
                 SELECT sc.*, 
                        t.cedula, t.nombres, t.apellidos, t.fecha_ingreso, t.sueldo_base,
-                       c.nombre AS cargo_nombre, d.nombre AS departamento_nombre,
-                       u.nombre_usuario AS emitido_por_usuario
+                       c.nombre AS cargo_nombre, d.nombre AS departamento_nombre
                 FROM solicitud_constancia sc
                 INNER JOIN trabajador t ON sc.trabajador_id = t.trabajador_id
                 INNER JOIN cargo c ON t.cargo_id = c.cargo_id
                 LEFT JOIN departamento d ON c.departamento_id = d.departamento_id
-                LEFT JOIN usuario u ON sc.emitida_por = u.usuario_id
                 WHERE sc.constancia_id = %s;
             """
             cursor.execute(sql, (constancia_id,))
             constancia = cursor.fetchone()
 
-            if not constancia or constancia['estado'] != 'emitida':
-                flash('La constancia aún no ha sido emitida o no existe.', 'warning')
+            if not constancia:
+                flash('Documento no encontrado.', 'warning')
                 return redirect(url_for('portal.constancias'))
 
-            # Validación de pertenencia si consulta un trabajador
-            trabajador_id = obtener_trabajador_id_actual(cursor)
-            if session.get('rol') == 'trabajador' and constancia['trabajador_id'] != trabajador_id:
-                flash('No tiene autorización para consultar este documento.', 'danger')
-                return redirect(url_for('portal.constancias'))
+            # Sueldo mensual base institucional (quincena * 2)
+            sueldo_base_mensual = float(constancia['sueldo_base'] or 158.00) * 2
+            sueldo_en_letras = numero_a_letras(sueldo_base_mensual)
 
             meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
             hoy = datetime.date.today()
-            fecha_texto = f"a los {hoy.day} días del mes de {meses[hoy.month - 1]} de {hoy.year}"
 
             return render_template(
-                'portal/portal_constancia_imprimir.html',
+                'portal/portal_constancia_andre.html',
                 c=constancia,
-                fecha_texto=fecha_texto
+                sueldo_num=f"{sueldo_base_mensual:,.2f}",
+                sueldo_letras=sueldo_en_letras,
+                dia=f"{hoy.day:02d}",
+                mes=meses[hoy.month - 1],
+                ano=hoy.year
             )
     finally:
         conexion.close()
+        
+# -------------------------------------------------------------------------
+# PORTAL: Solicitud y Lista de Permisos Laborales (Ordinarios y Pre/Postnatal)
+# -------------------------------------------------------------------------
+@portal_bp.route('/permisos', methods=['GET', 'POST'])
+def permisos():
+    if 'usuario_id' not in session or session.get('rol') != 'trabajador':
+        return redirect(url_for('auth.login'))
+
+    conexion = get_db_connection()
+    try:
+        with conexion.cursor() as cursor:
+            t_id = obtener_trabajador_id_actual(cursor)
+            if not t_id:
+                flash('Cuenta no vinculada a una ficha de trabajador.', 'danger')
+                return redirect(url_for('portal.inicio'))
+
+            if request.method == 'POST':
+                tipo_permiso = request.form.get('tipo_permiso', 'ordinario')
+                fecha_inicio = request.form.get('fecha_inicio')
+                fecha_fin = request.form.get('fecha_fin')
+                duracion = request.form.get('duracion', '').strip()
+                motivo = request.form.get('motivo', '').strip()
+
+                cursor.execute("""
+                    INSERT INTO solicitud_permiso (
+                        trabajador_id, tipo_permiso, duracion, fecha_inicio, 
+                        fecha_fin, motivo, estado, fecha_solicitud
+                    ) VALUES (%s, %s, %s, %s, %s, %s, 'solicitado', NOW());
+                """, (t_id, tipo_permiso, duracion, fecha_inicio, fecha_fin, motivo))
+                conexion.commit()
+                flash('Solicitud de permiso generada. Imprima la boleta oficial para la firma física de su supervisor.', 'success')
+                return redirect(url_for('portal.permisos'))
+
+            cursor.execute("""
+                SELECT * FROM solicitud_permiso 
+                WHERE trabajador_id = %s 
+                ORDER BY permiso_id DESC;
+            """, (t_id,))
+            historial = cursor.fetchall()
+            return render_template('portal/portal_permisos.html', permisos=historial)
+    finally:
+        conexion.close()
+
+# -------------------------------------------------------------------------
+# IMPRIMIR: Boleta Oficial de Permiso (Formato Exacto FORMATO DE PERMISOS.docx)
+# -------------------------------------------------------------------------
+@portal_bp.route('/permisos/<int:permiso_id>/imprimir-boleta')
+def imprimir_boleta_permiso(permiso_id):
+    conexion = get_db_connection()
+    try:
+        with conexion.cursor() as cursor:
+            sql = """
+                SELECT sp.*, t.cedula, t.nombres, t.apellidos,
+                       c.nombre AS cargo_nombre, d.nombre AS departamento_nombre
+                FROM solicitud_permiso sp
+                INNER JOIN trabajador t ON sp.trabajador_id = t.trabajador_id
+                INNER JOIN cargo c ON t.cargo_id = c.cargo_id
+                LEFT JOIN departamento d ON c.departamento_id = d.departamento_id
+                WHERE sp.permiso_id = %s;
+            """
+            cursor.execute(sql, (permiso_id,))
+            permiso = cursor.fetchone()
+            if not permiso:
+                flash('Permiso no encontrado.', 'warning')
+                return redirect(url_for('portal.permisos'))
+
+            hoy = datetime.date.today()
+            return render_template('portal/portal_permiso_boleta.html', p=permiso, hoy=hoy)
+    finally:
+        conexion.close()
+
+# -------------------------------------------------------------------------
+# IMPRIMIR: Solicitud Pre y Postnatal (Formato Exacto EDUMARLI ALCINA)
+# -------------------------------------------------------------------------
+@portal_bp.route('/permisos/<int:permiso_id>/imprimir-maternidad')
+def imprimir_maternidad(permiso_id):
+    conexion = get_db_connection()
+    try:
+        with conexion.cursor() as cursor:
+            sql = """
+                SELECT sp.*, t.cedula, t.nombres, t.apellidos,
+                       c.nombre AS cargo_nombre, d.nombre AS departamento_nombre
+                FROM solicitud_permiso sp
+                INNER JOIN trabajador t ON sp.trabajador_id = t.trabajador_id
+                INNER JOIN cargo c ON t.cargo_id = c.cargo_id
+                LEFT JOIN departamento d ON c.departamento_id = d.departamento_id
+                WHERE sp.permiso_id = %s;
+            """
+            cursor.execute(sql, (permiso_id,))
+            permiso = cursor.fetchone()
+            hoy = datetime.date.today()
+            return render_template('portal/portal_maternidad_imprimir.html', p=permiso, hoy=hoy)
+    finally:
+        conexion.close()
+
+# -------------------------------------------------------------------------
+# IMPRIMIR: Constancia de Trabajo (Formato Exacto CONSTANCIAS ANDRE.DOC)
+# -------------------------------------------------------------------------

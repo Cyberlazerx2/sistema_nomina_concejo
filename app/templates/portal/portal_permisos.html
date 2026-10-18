@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}Mis Permisos Laborales - Portal del Funcionario{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none mb-4">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="text-muted small text-uppercase fw-bold">Autoservicio del Funcionario</div>
+            <h2 class="page-title text-dark">
+                Permisos y Licencias Laborales
+            </h2>
+            <div class="text-muted mt-1">
+                Generación de boleta oficial de permiso para trámite y firma física ante su supervisor y RRHH.
+            </div>
+        </div>
+        <div class="col-auto ms-auto d-flex gap-2">
+            <button type="button" class="btn btn-primary d-inline-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#modalNuevoPermiso">
+                <span>➕</span> Solicitar Permiso
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-light py-3 d-flex justify-content-between align-items-center">
+        <h3 class="card-title text-dark mb-0">Historial de Permisos Registrados</h3>
+        <span class="badge bg-blue-lt">{{ permisos|length }} registros</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-hover">
+            <thead>
+                <tr>
+                    <th>Fecha Solicitud</th>
+                    <th>Tipo Permiso</th>
+                    <th>Lapso / Duración</th>
+                    <th>Motivo</th>
+                    <th class="text-center">Estatus Físico</th>
+                    <th class="w-1 text-center">Boleta Oficial</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in permisos %}
+                <tr>
+                    <td class="font-monospace small text-muted">
+                        {{ p.fecha_solicitud.strftime('%d/%m/%Y') if p.fecha_solicitud and p.fecha_solicitud.strftime is defined else p.fecha_solicitud }}
+                    </td>
+                    <td>
+                        <span class="badge bg-secondary-lt text-uppercase font-monospace">{{ p.tipo_permiso|replace('_', ' ') }}</span>
+                    </td>
+                    <td>
+                        <div class="fw-bold text-dark">{{ p.duracion }}</div>
+                        <div class="text-muted small font-monospace">{{ p.fecha_inicio }} al {{ p.fecha_fin }}</div>
+                    </td>
+                    <td class="small text-muted" style="max-width: 250px;">
+                        {{ p.motivo }}
+                    </td>
+                    <td class="text-center">
+                        {% if p.estado == 'solicitado' %}
+                            <span class="badge bg-warning-lt text-uppercase"><span class="badge-dot bg-warning me-1"></span>En Proceso de Firma</span>
+                        {% elif p.estado == 'consignado_aprobado' %}
+                            <span class="badge bg-success-lt text-uppercase"><span class="badge-dot bg-success me-1"></span>Aprobado en Físico</span>
+                        {% elif p.estado == 'negado' %}
+                            <span class="badge bg-danger-lt text-uppercase"><span class="badge-dot bg-danger me-1"></span>Negado</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if p.tipo_permiso == 'pre_postnatal' %}
+                        <a href="{{ url_for('portal.imprimir_maternidad', permiso_id=p.permiso_id) }}" target="_blank" class="btn btn-sm btn-outline-dark d-inline-flex align-items-center gap-1">
+                            <span>📄</span> Carta Maternidad
+                        </a>
+                        {% else %}
+                        <a href="{{ url_for('portal.imprimir_boleta_permiso', permiso_id=p.permiso_id) }}" target="_blank" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1">
+                            <span>🖨️</span> Boleta Oficial
+                        </a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">
+                        No posee solicitudes de permiso registradas.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal: Solicitar Permiso -->
+<div class="modal modal-blur fade" id="modalNuevoPermiso" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="POST" action="{{ url_for('portal.permisos') }}" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">Solicitud de Permiso / Ausencia Laboral</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Tipo de Permiso:</label>
+                    <select name="tipo_permiso" class="form-select" required>
+                        <option value="ordinario" selected>Permiso Ordinario / Diligencia Personal</option>
+                        <option value="medico">Permiso Médico (Reposo / Consulta)</option>
+                        <option value="duelo">Permiso por Duelo Familiar (LOTTT)</option>
+                        <option value="estudio">Permiso de Estudio / Capacitación</option>
+                        <option value="pre_postnatal">Licencia Pre y Postnatal (Maternidad LOTTT)</option>
+                    </select>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label fw-bold">Fecha Inicio:</label>
+                        <input type="date" name="fecha_inicio" class="form-control" required>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold">Fecha Fin:</label>
+                        <input type="date" name="fecha_fin" class="form-control" required>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Duración Estimada:</label>
+                    <input type="text" name="duracion" class="form-control" placeholder="Ej: 2 días hábiles, 1 mañana..." required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Motivo Detallado:</label>
+                    <textarea name="motivo" rows="3" class="form-control" placeholder="Describa la justificación del permiso..." required></textarea>
+                </div>
+                <div class="alert alert-info py-2 small mb-0">
+                    ℹ️ Al enviar esta solicitud se generará su <strong>Boleta Oficial de Permiso</strong>. Debe imprimirla, recabar la firma física de su supervisor inmediato y consignarla en Talento Humano para su registro definitivo.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-primary fw-bold">Generar Boleta Oficial</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
