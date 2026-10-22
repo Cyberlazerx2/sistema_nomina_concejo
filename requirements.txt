@@ -3,3 +3,4 @@ PyMySQL
 werkzeug
 gunicorn
 cryptography
+python-dotenv
