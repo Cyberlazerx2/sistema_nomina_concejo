@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block title %}Mi Fondo de Vivienda (FAOV) - Portal del Funcionario{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none mb-4">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="text-muted small text-uppercase fw-bold">Régimen Prestacional de Vivienda y Hábitat</div>
+            <h2 class="page-title text-dark">
+                Fondo de Ahorro Obligatorio para la Vivienda (FAOV)
+            </h2>
+            <div class="text-muted mt-1">
+                Concejo Municipal de Independencia · Consulta de cotizaciones individuales y certificación validada por RRHH.
+            </div>
+        </div>
+        <div class="col-auto ms-auto d-flex gap-2">
+            <a href="{{ url_for('portal.inicio') }}" class="btn btn-outline-secondary">
+                ← Volver al Portal
+            </a>
+            <!-- Botón para solicitar certificación oficial a RRHH -->
+            <button type="button" class="btn btn-primary d-inline-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#modalSolicitarFAOV">
+                <span>➕</span> Solicitar Certificación FAOV
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Tarjetas de Resumen de Cotizaciones del Ejercicio Fiscal -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm border-start border-primary border-4">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase fw-bold">Aporte Funcionario (1%)</div>
+                <div class="h2 text-primary font-monospace mt-1 mb-0">
+                    Bs. {{ "{:,.2f}".format(total_trabajador|float) }}
+                </div>
+                <small class="text-muted">Retenido en nómina ordinaria (Ejercicio {{ anio_activo }})</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm border-start border-info border-4">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase fw-bold">Aporte Patronal Concejo (2%)</div>
+                <div class="h2 text-info font-monospace mt-1 mb-0">
+                    Bs. {{ "{:,.2f}".format(total_patronal|float) }}
+                </div>
+                <small class="text-muted">Contraparte institucional obligatoria</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm border-start border-success border-4">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase fw-bold">Total Acumulado BANAVIH (3%)</div>
+                <div class="h2 text-success font-monospace mt-1 mb-0">
+                    Bs. {{ "{:,.2f}".format(gran_total_banavih|float) }}
+                </div>
+                <small class="text-muted">Fondo habitacional para créditos hipotecarios</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 1. Historial de Certificaciones Solicitadas a RRHH -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-light py-3 d-flex justify-content-between align-items-center">
+        <h3 class="card-title text-dark mb-0">Mis Certificaciones Oficiales de Retención</h3>
+        <span class="badge bg-blue-lt">{{ solicitudes|length }} trámites</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-hover">
+            <thead>
+                <tr>
+                    <th>Fecha Solicitud</th>
+                    <th>Año Certificado</th>
+                    <th>Correlativo Oficial</th>
+                    <th>Motivo / Trámite</th>
+                    <th class="text-center">Estatus</th>
+                    <th class="w-1 text-center">Documento</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in solicitudes %}
+                <tr>
+                    <td class="font-monospace small text-muted">
+                        {{ s.fecha_solicitud.strftime('%d/%m/%Y %H:%M') if s.fecha_solicitud and s.fecha_solicitud.strftime is defined else s.fecha_solicitud }}
+                    </td>
+                    <td class="font-monospace fw-bold text-dark">Año {{ s.anio }}</td>
+                    <td class="font-monospace text-primary fw-bold">{{ s.correlativo or 'En trámite' }}</td>
+                    <td class="small text-muted">{{ s.motivo }}</td>
+                    <td class="text-center">
+                        {% if s.estado == 'solicitada' %}
+                            <span class="badge bg-warning-lt text-uppercase"><span class="badge-dot bg-warning me-1"></span>En Revisión por RRHH</span>
+                        {% elif s.estado == 'aprobada' %}
+                            <span class="badge bg-success-lt text-uppercase"><span class="badge-dot bg-success me-1"></span>Aprobada</span>
+                        {% elif s.estado == 'rechazada' %}
+                            <span class="badge bg-danger-lt text-uppercase" title="{{ s.motivo_rechazo or '' }}"><span class="badge-dot bg-danger me-1"></span>Rechazada</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if s.estado == 'aprobada' %}
+                            <a href="{{ url_for('portal.imprimir_constancia_faov', solicitud_id=s.solicitud_faov_id) }}" target="_blank" class="btn btn-sm btn-dark d-inline-flex align-items-center gap-1">
+                                <span>🖨️</span> Descargar / Imprimir
+                            </a>
+                        {% else %}
+                            <button class="btn btn-sm btn-outline-secondary" disabled>No disponible</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-3">
+                        No has solicitado certificaciones formales de FAOV. Pulsa el botón superior para generar una solicitud.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 2. Detalle Quincenal de Nóminas Aprobadas -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-light py-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <h3 class="card-title text-dark mb-0">Relación Quincenal de Retenciones y Aportes</h3>
+        <div class="d-flex align-items-center gap-2">
+            <span class="text-muted small fw-bold">Filtrar Año:</span>
+            <div class="btn-group">
+                {% for a in anios %}
+                    <a href="{{ url_for('portal.faov_estado_cuenta', anio=a) }}" class="btn btn-sm {{ 'btn-primary active' if a|string == anio_activo else 'btn-outline-secondary' }}">
+                        {{ a }}
+                    </a>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-hover">
+            <thead>
+                <tr>
+                    <th>Periodo de Nómina</th>
+                    <th>Lapso Quincenal</th>
+                    <th class="text-end">Retención 1% (Funcionario)</th>
+                    <th class="text-end">Aporte 2% (Patrono)</th>
+                    <th class="text-end">Total 3% (BANAVIH)</th>
+                    <th class="text-center">Estatus</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in movimientos %}
+                <tr>
+                    <td>
+                        <div class="fw-bold text-dark">{{ m.periodo }}</div>
+                        <span class="badge bg-light text-muted border text-uppercase" style="font-size: 10px;">
+                            {{ m.tipo_nomina|replace('_', ' ') }}
+                        </span>
+                    </td>
+                    <td class="text-muted font-monospace small">
+                        {{ m.fecha_inicio }} al {{ m.fecha_fin }}
+                    </td>
+                    <td class="text-end font-monospace fw-bold text-danger">
+                        Bs. {{ "{:,.2f}".format(m.retencion_trabajador|float) }}
+                    </td>
+                    <td class="text-end font-monospace text-muted">
+                        Bs. {{ "{:,.2f}".format(m.aporte_patronal|float) }}
+                    </td>
+                    <td class="text-end font-monospace fw-bold text-success">
+                        Bs. {{ "{:,.2f}".format(m.total_depositado|float) }}
+                    </td>
+                    <td class="text-center">
+                        <span class="badge bg-success-lt text-uppercase"><span class="badge-dot bg-success me-1"></span>Enterado</span>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">
+                        No se registran retenciones de FAOV aprobadas para el ejercicio fiscal {{ anio_activo }}.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            {% if movimientos %}
+            <tfoot>
+                <tr class="table-light fw-bold">
+                    <td colspan="2" class="text-center text-uppercase">Totales del Ejercicio {{ anio_activo }}</td>
+                    <td class="text-end font-monospace text-danger">Bs. {{ "{:,.2f}".format(total_trabajador|float) }}</td>
+                    <td class="text-end font-monospace text-muted">Bs. {{ "{:,.2f}".format(total_patronal|float) }}</td>
+                    <td class="text-end font-monospace text-success fs-4">Bs. {{ "{:,.2f}".format(gran_total_banavih|float) }}</td>
+                    <td></td>
+                </tr>
+            </tfoot>
+            {% endif %}
+        </table>
+    </div>
+</div>
+
+<!-- Modal para Solicitar Certificación FAOV -->
+<div class="modal modal-blur fade" id="modalSolicitarFAOV" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="POST" action="{{ url_for('portal.faov_estado_cuenta') }}" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">Solicitud de Certificación FAOV / BANAVIH</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Ejercicio Fiscal a Certificar:</label>
+                    <select name="anio_solicitud" class="form-select" required>
+                        {% for a in anios %}
+                            <option value="{{ a }}" {% if a|string == anio_activo %}selected{% endif %}>Año Fiscal {{ a }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Destino / Entidad Bancaria:</label>
+                    <input type="text" name="motivo" class="form-control" placeholder="Ej: Banco de Venezuela - Solicitud Crédito Hipotecario" required>
+                    <small class="text-muted">Indique el trámite para el cual consignará el documento ante BANAVIH o el banco.</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-primary fw-bold">Remitir a Talento Humano</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

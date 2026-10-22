@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}Mis Vacaciones - Portal del Funcionario{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none mb-4">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="text-muted small text-uppercase fw-bold">Beneficios Laborales LOTTT</div>
+            <h2 class="page-title text-dark">
+                Régimen de Vacaciones Anuales
+            </h2>
+            <div class="text-muted mt-1">
+                Concejo Municipal de Independencia · Consulta de antigüedad, balance de días hábiles y programación de salidas.
+            </div>
+        </div>
+        <div class="col-auto ms-auto d-flex gap-2">
+            <button type="button" class="btn btn-primary d-inline-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#modalSolicitarVacaciones" {% if saldo_disponible == 0 %}disabled{% endif %}>
+                <span>✈️</span> Programar Salida
+            </button>
+        </div>
+    </div>
+</div>
+
+{% if alerta_acumulacion %}
+<div class="alert alert-warning alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
+    <strong>⚠️ Alerta Legal (Art. 199 LOTTT):</strong> Posee dos (2) períodos vacacionales acumulados sin disfrute. Es obligatoria la coordinación con la Dirección de Talento Humano para hacer efectivo el descanso laboral reglamentario.
+</div>
+{% endif %}
+
+<!-- Tarjetas de Saldo Legal -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase fw-bold">Años de Servicio</div>
+                <div class="h2 text-dark font-monospace mt-1 mb-0">{{ anios_servicio }} año(s)</div>
+                <small class="text-muted">Ingreso: {{ t.fecha_ingreso }}</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase fw-bold">Días Causados (Art. 190)</div>
+                <div class="h2 text-primary font-monospace mt-1 mb-0">{{ dias_derecho }} hábiles</div>
+                <small class="text-muted">15 base + días por antigüedad</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase fw-bold">Días Disfrutados</div>
+                <div class="h2 text-muted font-monospace mt-1 mb-0">{{ dias_disfrutados }} hábiles</div>
+                <small class="text-muted">Gozados históricamente</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm border-start border-success border-4">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase fw-bold">Saldo Disponible</div>
+                <div class="h2 text-success font-monospace mt-1 mb-0">{{ saldo_disponible }} hábiles</div>
+                <small class="text-muted">Listos para programar</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Historial de Vacaciones -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-light py-3">
+        <h3 class="card-title text-dark mb-0">Historial de Períodos Vacacionales</h3>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-hover">
+            <thead>
+                <tr>
+                    <th>Período</th>
+                    <th>Lapso de Salida</th>
+                    <th class="text-center">Días Hábiles</th>
+                    <th class="text-center">Estatus</th>
+                    <th class="w-1 text-center">Boleta Oficial</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for h in historial %}
+                <tr>
+                    <td class="font-monospace fw-bold text-dark">{{ h.periodo }}</td>
+                    <td>{{ h.fecha_inicio }} al {{ h.fecha_fin }}</td>
+                    <td class="text-center font-monospace fw-bold">{{ h.dias_habiles }} día(s)</td>
+                    <td class="text-center">
+                        {% if h.estado == 'pendiente' %}
+                            <span class="badge bg-warning-lt text-uppercase"><span class="badge-dot bg-warning me-1"></span>En Revisión</span>
+                        {% elif h.estado == 'aprobada' %}
+                            <span class="badge bg-success-lt text-uppercase"><span class="badge-dot bg-success me-1"></span>Aprobada</span>
+                        {% elif h.estado == 'rechazada' %}
+                            <span class="badge bg-danger-lt text-uppercase"><span class="badge-dot bg-danger me-1"></span>Rechazada</span>
+                        {% elif h.estado == 'disfrutada' %}
+                            <span class="badge bg-secondary-lt text-uppercase">Disfrutada</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <a href="{{ url_for('portal.imprimir_boleta_vacaciones', vacacion_id=h.vacacion_id) }}" target="_blank" class="btn btn-sm btn-outline-dark">
+                            🖨️ Boleta Oficial
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted py-4">No registra solicitudes de vacaciones previas.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal para Solicitar Vacaciones -->
+<div class="modal modal-blur fade" id="modalSolicitarVacaciones" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="POST" action="{{ url_for('portal.vacaciones') }}" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">Programar Salida Vacacional</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small">
+                    Saldo disponible para este período: <strong>{{ saldo_disponible }} días hábiles</strong>.
+                </p>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label fw-bold">Fecha Inicio:</label>
+                        <input type="date" name="fecha_inicio" class="form-control" required>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold">Fecha Fin:</label>
+                        <input type="date" name="fecha_fin" class="form-control" required>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Días Hábiles Solicitados:</label>
+                    <input type="number" name="dias_habiles" class="form-control font-monospace" min="1" max="{{ saldo_disponible }}" required>
+                    <small class="text-muted">Excluya fines de semana y días feriados oficiales.</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-primary fw-bold">Remitir a Talento Humano</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

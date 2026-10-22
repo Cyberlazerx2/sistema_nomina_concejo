@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Certificación FAOV - {{ t.nombres }} {{ t.apellidos }}</title>
+    <style>
+        @page { size: letter portrait; margin: 20mm; }
+        body { font-family: "Times New Roman", Times, serif; font-size: 11pt; line-height: 1.5; color: #000; margin: 0; padding: 15px; background: #fff; }
+        .membrete { text-align: center; font-weight: bold; font-size: 10pt; line-height: 1.3; text-transform: uppercase; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 20px; }
+        .titulo { text-align: center; font-size: 14pt; font-weight: bold; text-decoration: underline; margin-bottom: 25px; letter-spacing: 1px; }
+        .cuerpo { text-align: justify; text-indent: 40px; margin-bottom: 16px; }
+        .tabla-cotizaciones { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 9.5pt; font-family: Arial, sans-serif; }
+        .tabla-cotizaciones th, .tabla-cotizaciones td { border: 1px solid #333; padding: 4px 6px; }
+        .tabla-cotizaciones th { background-color: #f2f2f2; text-align: center; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .firma-bloque { margin-top: 50px; text-align: center; font-size: 10pt; }
+        .linea { width: 250px; border-top: 1px solid #000; margin: 0 auto 6px auto; }
+        .btn-imprimir { position: fixed; top: 15px; right: 15px; background: #0f172a; color: #fff; padding: 9px 16px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        @media print { .btn-imprimir { display: none !important; } }
+    </style>
+</head>
+<body>
+
+<button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir Certificación FAOV</button>
+
+<div class="correlativo" style="text-align: right; font-family: Arial, sans-serif; font-size: 11px; font-weight: bold; margin-bottom: 20px;">
+    N° EXPEDIENTE: {{ s.correlativo }}
+</div>
+
+<div class="membrete">
+    REPÚBLICA BOLIVARIANA DE VENEZUELA<br>
+    ESTADO YARACUY · MUNICIPIO INDEPENDENCIA<br>
+    CONCEJO MUNICIPAL DE INDEPENDENCIA<br>
+    DIRECCIÓN DE TALENTO HUMANO<br>
+    RIF: G-20006055-7
+</div>
+
+<div class="titulo">
+    CONSTANCIA DE RETENCIÓN Y ENTERAMIENTO FAOV / BANAVIH
+</div>
+
+<div class="cuerpo">
+    Quien suscribe, <strong>LCDA. LINDA ESPERANZA LEÓN</strong>, titular de la Cédula de Identidad N° <strong>V-14.567.890</strong>, en mi carácter de <strong>Directora de Talento Humano del Concejo Municipal del Municipio Independencia del Estado Yaracuy</strong>, por medio de la presente certifica que:
+</div>
+
+<div class="cuerpo">
+    El (La) ciudadano(a) <strong>{{ t.nombres|upper }} {{ t.apellidos|upper }}</strong>, titular de la Cédula de Identidad N° <strong>V-{{ t.cedula }}</strong>, presta servicios en esta institución legislativa desempeñando el cargo de <strong>{{ t.cargo_nombre|upper }}</strong> adscrito(a) a <strong>{{ (t.departamento_nombre or 'Concejo Municipal')|upper }}</strong>, y se encuentra debidamente inscrito(a) en el <strong>Fondo de Ahorro Obligatorio para la Vivienda (FAOV)</strong> bajo el número patronal del Concejo Municipal.
+</div>
+
+<div class="cuerpo">
+    Durante el Ejercicio Fiscal <strong>{{ anio }}</strong>, a dicho funcionario se le han efectuado las deducciones de ley equivalentes al uno por ciento (1%) de su asignación salarial[cite: 15], habiendo sido enteradas oportunamente ante el Banco Nacional de Vivienda y Hábitat (BANAVIH) conjuntamente con el aporte patronal del dos por ciento (2%), conforme a la relación detallada a continuación:
+</div>
+
+<table class="tabla-cotizaciones">
+    <thead>
+        <tr>
+            <th>Periodo de Pago</th>
+            <th>Fecha Corte</th>
+            <th class="text-right">Aporte Trabajador (1%)</th>
+            <th class="text-right">Aporte Institucional (2%)</th>
+            <th class="text-right">Total Enterado BANAVIH (3%)</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for d in detalles %}
+        <tr>
+            <td>{{ d.descripcion }}</td>
+            <td class="text-center">{{ d.fecha_fin }}</td>
+            <td class="text-right">Bs. {{ "{:,.2f}".format(d.retencion_trabajador|float) }}</td>
+            <td class="text-right">Bs. {{ "{:,.2f}".format((d.retencion_trabajador|float) * 2) }}</td>
+            <td class="text-right fw-bold">Bs. {{ "{:,.2f}".format((d.retencion_trabajador|float) * 3) }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+    <tfoot>
+        <tr style="background-color: #f2f2f2; font-weight: bold;">
+            <td colspan="2" class="text-center">TOTALES ACUMULADOS AÑO {{ anio }}</td>
+            <td class="text-right">Bs. {{ "{:,.2f}".format(total_retenido|float) }}</td>
+            <td class="text-right">Bs. {{ "{:,.2f}".format(total_patrono|float) }}</td>
+            <td class="text-right">Bs. {{ "{:,.2f}".format(total_general|float) }}</td>
+        </tr>
+    </tfoot>
+</table>
+
+<div class="cuerpo">
+    Constancia que se expide a petición de la parte interesada a los fines consiguientes de trámite hipotecario o bancario, en la ciudad de Independencia, <strong>{{ fecha_texto }}</strong>.
+</div>
+
+<div class="firma-bloque">
+    Atentamente,
+    <br><br><br><br>
+    <div class="linea"></div>
+    <strong>LCDA. LINDA ESPERANZA LEÓN</strong><br>
+    Directora de Talento Humano<br>
+    Concejo Municipal de Independencia<br>
+    Estado Yaracuy
+</div>
+
+</body>
+</html>

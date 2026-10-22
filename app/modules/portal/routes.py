@@ -3,6 +3,7 @@ import uuid
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from app.database import get_db_connection
 from app.modules.portal.numero_letras import numero_a_letras
+from decimal import Decimal
 
 portal_bp = Blueprint('portal', __name__)
 
@@ -392,7 +393,7 @@ def constancias():
             trabajador_id = obtener_trabajador_id_actual(cursor)
 
             if not trabajador_id:
-                flash('Su cuenta de usuario no tiene una ficha de trabajador vinculada en el sistema. Contacte a Recursos Humanos.', 'danger')
+                flash('Su cuenta de usuario no tiene una ficha de trabajador vinculada.', 'danger')
                 return redirect(url_for('portal.inicio'))
 
             if request.method == 'POST':
@@ -402,7 +403,7 @@ def constancias():
 
                 cursor.execute("""
                     INSERT INTO solicitud_constancia (trabajador_id, tipo, destinatario, motivo, estado, fecha_solicitud)
-                    VALUES (%s, %s, %s, %s, 'pendiente', NOW());
+                    VALUES (%s, %s, %s, %s, 'solicitada', NOW());
                 """, (trabajador_id, tipo, destinatario or 'A QUIEN PUEDA INTERESAR', motivo or None))
                 conexion.commit()
                 flash('Solicitud de constancia de trabajo registrada con éxito.', 'success')
@@ -426,6 +427,9 @@ def constancias():
 # -------------------------------------------------------------------------
 @portal_bp.route('/constancias/<int:constancia_id>/imprimir')
 def imprimir_constancia(constancia_id):
+    if 'usuario_id' not in session:
+        return redirect(url_for('auth.login'))
+
     conexion = get_db_connection()
     try:
         with conexion.cursor() as cursor:
@@ -442,8 +446,15 @@ def imprimir_constancia(constancia_id):
             cursor.execute(sql, (constancia_id,))
             constancia = cursor.fetchone()
 
-            if not constancia:
-                flash('Documento no encontrado.', 'warning')
+            # Validación correcta de existencia y estado aprobado
+            if not constancia or constancia['estado'] not in ['emitida', 'firmada_entregada']:
+                flash('La constancia aún no ha sido emitida por Recursos Humanos o no existe.', 'warning')
+                return redirect(url_for('portal.constancias'))
+
+            # Validación de autorización si consulta un trabajador
+            trabajador_id = obtener_trabajador_id_actual(cursor)
+            if session.get('rol') == 'trabajador' and constancia['trabajador_id'] != trabajador_id:
+                flash('No tiene autorización para consultar este documento.', 'danger')
                 return redirect(url_for('portal.constancias'))
 
             # Sueldo mensual base institucional (quincena * 2)
@@ -561,5 +572,302 @@ def imprimir_maternidad(permiso_id):
         conexion.close()
 
 # -------------------------------------------------------------------------
-# IMPRIMIR: Constancia de Trabajo (Formato Exacto CONSTANCIAS ANDRE.DOC)
+# FAOV: Estado de Cuenta Individual y Cotizaciones BANAVIH
 # -------------------------------------------------------------------------
+@portal_bp.route('/faov', methods=['GET', 'POST'])
+def faov_estado_cuenta():
+    if 'usuario_id' not in session or session.get('rol') != 'trabajador':
+        flash('Acceso restringido al portal del funcionario.', 'danger')
+        return redirect(url_for('auth.login'))
+
+    anio_actual = datetime.date.today().year
+    anio_seleccionado = request.args.get('anio', default=str(anio_actual))
+
+    conexion = get_db_connection()
+    try:
+        with conexion.cursor() as cursor:
+            t_id = obtener_trabajador_id_actual(cursor)
+            if not t_id:
+                flash('Cuenta no vinculada a una ficha de trabajador.', 'danger')
+                return redirect(url_for('portal.inicio'))
+
+            # Procesar nueva solicitud de certificación
+            if request.method == 'POST':
+                anio_sol = request.form.get('anio_solicitud', anio_actual)
+                motivo = request.form.get('motivo', '').strip()
+
+                cursor.execute("""
+                    INSERT INTO solicitud_faov (trabajador_id, anio, motivo, estado, fecha_solicitud)
+                    VALUES (%s, %s, %s, 'solicitada', NOW());
+                """, (t_id, anio_sol, motivo or 'Trámite Habitacional / Crédito Hipotecario BANAVIH'))
+                conexion.commit()
+                flash('Solicitud de Certificación FAOV remitida a la Dirección de Recursos Humanos.', 'success')
+                return redirect(url_for('portal.faov_estado_cuenta', anio=anio_sol))
+
+            # Datos del trabajador
+            cursor.execute("""
+                SELECT t.*, c.nombre AS cargo_nombre, d.nombre AS departamento_nombre
+                FROM trabajador t
+                INNER JOIN cargo c ON t.cargo_id = c.cargo_id
+                LEFT JOIN departamento d ON c.departamento_id = d.departamento_id
+                WHERE t.trabajador_id = %s;
+            """, (t_id,))
+            trabajador = cursor.fetchone()
+
+            # Desglose de nóminas aprobadas para el año
+            sql_faov = """
+                SELECT nd.monto AS retencion_trabajador,
+                       pn.periodo_id, pn.descripcion, pn.fecha_inicio, pn.fecha_fin,
+                       pn.tipo_nomina, YEAR(pn.fecha_fin) AS anio
+                FROM nomina_detalle nd
+                INNER JOIN nomina_trabajador nt ON nd.nomina_trabajador_id = nt.nomina_trabajador_id
+                INNER JOIN periodo_nomina pn ON nt.periodo_id = pn.periodo_id
+                WHERE nt.trabajador_id = %s 
+                  AND nd.codigo_concepto = 'FAOV'
+                  AND pn.estado IN ('aprobada', 'procesada_patria')
+                  AND YEAR(pn.fecha_fin) = %s
+                ORDER BY pn.fecha_fin DESC;
+            """
+            cursor.execute(sql_faov, (t_id, anio_seleccionado))
+            registros_raw = cursor.fetchall()
+
+            # Años disponibles
+            cursor.execute("""
+                SELECT DISTINCT YEAR(pn.fecha_fin) AS anio
+                FROM nomina_detalle nd
+                INNER JOIN nomina_trabajador nt ON nd.nomina_trabajador_id = nt.nomina_trabajador_id
+                INNER JOIN periodo_nomina pn ON nt.periodo_id = pn.periodo_id
+                WHERE nt.trabajador_id = %s AND nd.codigo_concepto = 'FAOV'
+                  AND pn.estado IN ('aprobada', 'procesada_patria')
+                ORDER BY anio DESC;
+            """, (t_id,))
+            anios_disponibles = [row['anio'] for row in cursor.fetchall()]
+            if not anios_disponibles:
+                anios_disponibles = [anio_actual]
+
+            movimientos = []
+            total_trabajador = Decimal('0.00')
+            total_patronal = Decimal('0.00')
+            gran_total_banavih = Decimal('0.00')
+
+            for r in registros_raw:
+                ret_trab = Decimal(str(r['retencion_trabajador']))
+                aporte_pat = ret_trab * Decimal('2.00')
+                aporte_tot = ret_trab * Decimal('3.00')
+
+                total_trabajador += ret_trab
+                total_patronal += aporte_pat
+                gran_total_banavih += aporte_tot
+
+                movimientos.append({
+                    'periodo': r['descripcion'],
+                    'fecha_inicio': r['fecha_inicio'],
+                    'fecha_fin': r['fecha_fin'],
+                    'tipo_nomina': r['tipo_nomina'],
+                    'retencion_trabajador': ret_trab,
+                    'aporte_patronal': aporte_pat,
+                    'total_depositado': aporte_tot
+                })
+
+            # Historial de solicitudes de certificación de este trabajador
+            cursor.execute("""
+                SELECT * FROM solicitud_faov
+                WHERE trabajador_id = %s
+                ORDER BY solicitud_faov_id DESC;
+            """, (t_id,))
+            solicitudes = cursor.fetchall()
+
+            return render_template(
+                'portal/portal_faov.html',
+                trabajador=trabajador,
+                movimientos=movimientos,
+                total_trabajador=total_trabajador,
+                total_patronal=total_patronal,
+                gran_total_banavih=gran_total_banavih,
+                anios=anios_disponibles,
+                anio_activo=str(anio_seleccionado),
+                solicitudes=solicitudes
+            )
+    finally:
+        conexion.close()
+
+# -------------------------------------------------------------------------
+# FAOV: Constancia Oficial de Retenciones para Bancos y BANAVIH
+# -------------------------------------------------------------------------
+@portal_bp.route('/faov/imprimir/<int:solicitud_id>')
+def imprimir_constancia_faov(solicitud_id):
+    if 'usuario_id' not in session:
+        return redirect(url_for('auth.login'))
+
+    conexion = get_db_connection()
+    try:
+        with conexion.cursor() as cursor:
+            # Consultar solicitud
+            cursor.execute("""
+                SELECT sf.*, t.cedula, t.nombres, t.apellidos,
+                       c.nombre AS cargo_nombre, d.nombre AS departamento_nombre,
+                       u.nombre_usuario AS autorizador_nombre
+                FROM solicitud_faov sf
+                INNER JOIN trabajador t ON sf.trabajador_id = t.trabajador_id
+                INNER JOIN cargo c ON t.cargo_id = c.cargo_id
+                LEFT JOIN departamento d ON c.departamento_id = d.departamento_id
+                LEFT JOIN usuario u ON sf.aprobada_por = u.usuario_id
+                WHERE sf.solicitud_faov_id = %s;
+            """, (solicitud_id,))
+            solicitud = cursor.fetchone()
+
+            if not solicitud or solicitud['estado'] != 'aprobada':
+                flash('La certificación solicitada no ha sido aprobada por Recursos Humanos o no existe.', 'warning')
+                return redirect(url_for('portal.faov_estado_cuenta'))
+
+            # Validación de pertenencia para trabajadores
+            t_id = obtener_trabajador_id_actual(cursor)
+            if session.get('rol') == 'trabajador' and solicitud['trabajador_id'] != t_id:
+                flash('No tiene autorización para visualizar este documento.', 'danger')
+                return redirect(url_for('portal.faov_estado_cuenta'))
+
+            # Consultar retenciones de ese año específico
+            sql_faov = """
+                SELECT nd.monto AS retencion_trabajador,
+                       pn.periodo_id, pn.descripcion, pn.fecha_fin, pn.fecha_inicio
+                FROM nomina_detalle nd
+                INNER JOIN nomina_trabajador nt ON nd.nomina_trabajador_id = nt.nomina_trabajador_id
+                INNER JOIN periodo_nomina pn ON nt.periodo_id = pn.periodo_id
+                WHERE nt.trabajador_id = %s 
+                  AND nd.codigo_concepto = 'FAOV'
+                  AND pn.estado IN ('aprobada', 'procesada_patria')
+                  AND YEAR(pn.fecha_fin) = %s
+                ORDER BY pn.fecha_fin ASC;
+            """
+            cursor.execute(sql_faov, (solicitud['trabajador_id'], solicitud['anio']))
+            detalles = cursor.fetchall()
+
+            total_retenido = sum(Decimal(str(d['retencion_trabajador'])) for d in detalles)
+            total_patrono = total_retenido * Decimal('2.00')
+            total_general = total_retenido * Decimal('3.00')
+
+            meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+            fecha_ref = solicitud['fecha_aprobacion'] or datetime.date.today()
+            fecha_texto = f"a los {fecha_ref.day} días del mes de {meses[fecha_ref.month - 1]} de {fecha_ref.year}"
+
+            return render_template(
+                'portal/portal_faov_imprimir.html',
+                s=solicitud,
+                t=solicitud,
+                detalles=detalles,
+                total_retenido=total_retenido,
+                total_patrono=total_patrono,
+                total_general=total_general,
+                anio=solicitud['anio'],
+                fecha_texto=fecha_texto
+            )
+    finally:
+        conexion.close()
+        
+# -------------------------------------------------------------------------
+# VACACIONES: Consulta de Saldo y Solicitud del Funcionario
+# -------------------------------------------------------------------------
+@portal_bp.route('/vacaciones', methods=['GET', 'POST'])
+def vacaciones():
+    if 'usuario_id' not in session or session.get('rol') != 'trabajador':
+        return redirect(url_for('auth.login'))
+
+    conexion = get_db_connection()
+    try:
+        with conexion.cursor() as cursor:
+            t_id = obtener_trabajador_id_actual(cursor)
+            cursor.execute("""
+                SELECT t.*, c.nombre AS cargo_nombre, d.nombre AS departamento_nombre
+                FROM trabajador t
+                INNER JOIN cargo c ON t.cargo_id = c.cargo_id
+                LEFT JOIN departamento d ON c.departamento_id = d.departamento_id
+                WHERE t.trabajador_id = %s;
+            """, (t_id,))
+            trabajador = cursor.fetchone()
+
+            # Cómputo legal de antigüedad (Art. 190 LOTTT)
+            hoy = datetime.date.today()
+            f_ingreso = trabajador['fecha_ingreso']
+            if f_ingreso:
+                anios_servicio = hoy.year - f_ingreso.year - ((hoy.month, hoy.day) < (f_ingreso.month, f_ingreso.day))
+                anios_servicio = max(0, anios_servicio)
+            else:
+                anios_servicio = 0
+
+            # 15 días base + 1 por año adicional (máximo 30 días hábiles)
+            dias_derecho = min(15 + max(0, anios_servicio - 1), 30) if anios_servicio >= 1 else 0
+
+            # Días disfrutados acumulados
+            cursor.execute("""
+                SELECT COALESCE(SUM(dias_habiles), 0) AS disfrutados
+                FROM solicitud_vacaciones
+                WHERE trabajador_id = %s AND estado IN ('aprobada', 'disfrutada');
+            """, (t_id,))
+            dias_disfrutados = int(cursor.fetchone()['disfrutados'])
+            saldo_disponible = max(0, dias_derecho - dias_disfrutados)
+
+            # Advertencia legal Art. 199 (Acumulación máxima de 2 períodos)
+            alerta_acumulacion = anios_servicio >= 2 and saldo_disponible >= 30
+
+            if request.method == 'POST':
+                f_inicio = request.form.get('fecha_inicio')
+                f_fin = request.form.get('fecha_fin')
+                dias_solicitados = int(request.form.get('dias_habiles', 0))
+                periodo_texto = f"{hoy.year - 1} - {hoy.year}"
+
+                if dias_solicitados <= 0 or dias_solicitados > saldo_disponible:
+                    flash(f'La cantidad de días solicitados ({dias_solicitados}) supera su saldo disponible ({saldo_disponible} días).', 'danger')
+                    return redirect(url_for('portal.vacaciones'))
+
+                cursor.execute("""
+                    INSERT INTO solicitud_vacaciones (trabajador_id, periodo, fecha_inicio, fecha_fin, dias_habiles, estado, fecha_solicitud)
+                    VALUES (%s, %s, %s, %s, %s, 'pendiente', NOW());
+                """, (t_id, periodo_texto, f_inicio, f_fin, dias_solicitados))
+                conexion.commit()
+                flash('Solicitud de vacaciones registrada con éxito. Notifique a su supervisor para su visto bueno.', 'success')
+                return redirect(url_for('portal.vacaciones'))
+
+            cursor.execute("""
+                SELECT * FROM solicitud_vacaciones
+                WHERE trabajador_id = %s
+                ORDER BY vacacion_id DESC;
+            """, (t_id,))
+            historial = cursor.fetchall()
+
+            return render_template(
+                'portal/portal_vacaciones.html',
+                t=trabajador,
+                anios_servicio=anios_servicio,
+                dias_derecho=dias_derecho,
+                dias_disfrutados=dias_disfrutados,
+                saldo_disponible=saldo_disponible,
+                alerta_acumulacion=alerta_acumulacion,
+                historial=historial
+            )
+    finally:
+        conexion.close()
+
+
+# -------------------------------------------------------------------------
+# VACACIONES: Boleta Oficial Imprimible
+# -------------------------------------------------------------------------
+@portal_bp.route('/vacaciones/<int:vacacion_id>/imprimir')
+def imprimir_boleta_vacaciones(vacacion_id):
+    conexion = get_db_connection()
+    try:
+        with conexion.cursor() as cursor:
+            sql = """
+                SELECT sv.*, t.cedula, t.nombres, t.apellidos, t.fecha_ingreso,
+                       c.nombre AS cargo_nombre, d.nombre AS departamento_nombre
+                FROM solicitud_vacaciones sv
+                INNER JOIN trabajador t ON sv.trabajador_id = t.trabajador_id
+                INNER JOIN cargo c ON t.cargo_id = c.cargo_id
+                LEFT JOIN departamento d ON c.departamento_id = d.departamento_id
+                WHERE sv.vacacion_id = %s;
+            """
+            cursor.execute(sql, (vacacion_id,))
+            v = cursor.fetchone()
+            hoy = datetime.date.today()
+            return render_template('portal/portal_vacaciones_boleta.html', v=v, hoy=hoy)
+    finally:
+        conexion.close()

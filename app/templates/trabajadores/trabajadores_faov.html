@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Control de Certificaciones FAOV - RRHH{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none mb-4">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="text-muted small text-uppercase fw-bold">Dirección de Talento Humano</div>
+            <h2 class="page-title text-dark">
+                Certificaciones de Ahorro Habitacional (FAOV / BANAVIH)
+            </h2>
+            <div class="text-muted mt-1">
+                Concejo Municipal de Independencia · Validación y emisión de constancias de retención para créditos bancarios.
+            </div>
+        </div>
+        <div class="col-auto ms-auto d-flex gap-2">
+            <a href="{{ url_for('trabajadores.listar') }}" class="btn btn-outline-secondary">
+                ← Volver al Directorio
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-light py-3 d-flex justify-content-between align-items-center">
+        <h3 class="card-title text-dark mb-0">Solicitudes de Certificación Registradas</h3>
+        <span class="badge bg-blue-lt">{{ solicitudes|length }} trámites</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-hover">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Funcionario</th>
+                    <th>Año Fiscal</th>
+                    <th>Correlativo</th>
+                    <th>Motivo / Trámite</th>
+                    <th class="text-center">Estatus</th>
+                    <th class="w-1 text-center">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in solicitudes %}
+                <tr>
+                    <td class="font-monospace small text-muted">
+                        {{ s.fecha_solicitud.strftime('%d/%m/%Y') if s.fecha_solicitud and s.fecha_solicitud.strftime is defined else s.fecha_solicitud }}
+                    </td>
+                    <td>
+                        <div class="fw-bold text-dark">{{ s.nombres }} {{ s.apellidos }}</div>
+                        <div class="text-muted small font-monospace">V-{{ s.cedula }} · {{ s.cargo_nombre }}</div>
+                    </td>
+                    <td class="font-monospace fw-bold text-primary">Año {{ s.anio }}</td>
+                    <td class="font-monospace text-muted small">{{ s.correlativo or '—' }}</td>
+                    <td class="small text-muted" style="max-width: 200px;">{{ s.motivo }}</td>
+                    <td class="text-center">
+                        {% if s.estado == 'solicitada' %}
+                            <span class="badge bg-warning-lt text-uppercase"><span class="badge-dot bg-warning me-1"></span>Pendiente Revisión</span>
+                        {% elif s.estado == 'aprobada' %}
+                            <span class="badge bg-success-lt text-uppercase"><span class="badge-dot bg-success me-1"></span>Aprobada</span>
+                        {% elif s.estado == 'rechazada' %}
+                            <span class="badge bg-danger-lt text-uppercase"><span class="badge-dot bg-danger me-1"></span>Rechazada</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <div class="d-flex gap-1 justify-content-center">
+                            {% if s.estado == 'solicitada' %}
+                                <form method="POST" action="{{ url_for('trabajadores.procesar_faov_admin', id=s.solicitud_faov_id) }}" class="d-inline">
+                                    <input type="hidden" name="decision" value="aprobar">
+                                    <button type="submit" class="btn btn-sm btn-success fw-bold" onclick="return confirm('¿Aprobar y certificar las retenciones FAOV de este funcionario?');">
+                                        ✓ Validar
+                                    </button>
+                                </form>
+                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalRechazo{{ s.solicitud_faov_id }}">
+                                    ✕
+                                </button>
+
+                                <!-- Modal Rechazo -->
+                                <div class="modal modal-blur fade" id="modalRechazo{{ s.solicitud_faov_id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered text-start">
+                                        <form method="POST" action="{{ url_for('trabajadores.procesar_faov_admin', id=s.solicitud_faov_id) }}" class="modal-content">
+                                            <input type="hidden" name="decision" value="rechazar">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title fw-bold">Rechazar Certificación FAOV</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <label class="form-label fw-bold">Motivo del Rechazo:</label>
+                                                <textarea name="motivo_rechazo" class="form-control" rows="2" placeholder="Ej: Inconsistencia en nóminas requeridas..." required></textarea>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                <button type="submit" class="btn btn-danger fw-bold">Confirmar Rechazo</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            {% elif s.estado == 'aprobada' %}
+                                <a href="{{ url_for('portal.imprimir_constancia_faov', solicitud_id=s.solicitud_faov_id) }}" target="_blank" class="btn btn-sm btn-outline-dark">
+                                    🖨️ Ver Documento
+                                </a>
+                            {% else %}
+                                <span class="text-muted small">Sin acciones</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">No hay solicitudes de certificación FAOV pendientes.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

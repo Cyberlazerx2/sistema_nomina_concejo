@@ -359,8 +359,10 @@ def constancias_admin():
             """
             cursor.execute(sql)
             todas = cursor.fetchall()
-            pendientes = [c for c in todas if c['estado'] == 'pendiente']
-            emitidas = [c for c in todas if c['estado'] != 'pendiente']
+
+            # Considera tanto 'solicitada' como 'pendiente' en la bandeja de entrada
+            pendientes = [c for c in todas if c['estado'] in ['solicitada', 'pendiente']]
+            emitidas = [c for c in todas if c['estado'] not in ['solicitada', 'pendiente']]
 
             return render_template('trabajadores/trabajadores_constancias.html', pendientes=pendientes, emitidas=emitidas)
     finally:
@@ -375,7 +377,7 @@ def procesar_constancia(constancia_id):
         flash('Acceso no autorizado.', 'danger')
         return redirect(url_for('trabajadores.constancias_admin'))
 
-    accion = request.form.get('accion') # 'emitir' o 'rechazar'
+    accion = request.form.get('accion')  # 'emitir' o 'rechazar'
     motivo = request.form.get('motivo_rechazo', '').strip()
 
     conexion = get_db_connection()
@@ -383,7 +385,6 @@ def procesar_constancia(constancia_id):
         with conexion.cursor() as cursor:
             ahora = datetime.datetime.now()
             if accion == 'emitir':
-                # Generar correlativo institucional formal: DTH-CT-YYYY-XXXX
                 correlativo = f"DTH-CT-{ahora.year}-{constancia_id:04d}"
                 cursor.execute("""
                     UPDATE solicitud_constancia
@@ -464,3 +465,121 @@ def procesar_permiso_fisico(permiso_id):
         conexion.close()
 
     return redirect(url_for('trabajadores.permisos_admin'))
+
+# -------------------------------------------------------------------------
+# RRHH: Bandeja de Certificaciones FAOV
+# -------------------------------------------------------------------------
+@trabajadores_bp.route('/faov-admin')
+def faov_admin():
+    if 'usuario_id' not in session or session.get('rol') not in ['directora_rrhh', 'analista_rrhh', 'tecnico_informatica']:
+        flash('Acceso denegado.', 'danger')
+        return redirect(url_for('auth.dashboard'))
+
+    conexion = get_db_connection()
+    try:
+        with conexion.cursor() as cursor:
+            sql = """
+                SELECT sf.*, t.cedula, t.nombres, t.apellidos,
+                       c.nombre AS cargo_nombre, d.nombre AS departamento_nombre
+                FROM solicitud_faov sf
+                INNER JOIN trabajador t ON sf.trabajador_id = t.trabajador_id
+                INNER JOIN cargo c ON t.cargo_id = c.cargo_id
+                LEFT JOIN departamento d ON c.departamento_id = d.departamento_id
+                ORDER BY sf.solicitud_faov_id DESC;
+            """
+            cursor.execute(sql)
+            solicitudes = cursor.fetchall()
+            return render_template('trabajadores/trabajadores_faov.html', solicitudes=solicitudes)
+    finally:
+        conexion.close()
+
+
+@trabajadores_bp.route('/faov-admin/<int:id>/procesar', methods=['POST'])
+def procesar_faov_admin(id):
+    if 'usuario_id' not in session or session.get('rol') not in ['directora_rrhh', 'analista_rrhh']:
+        flash('Acceso no autorizado.', 'danger')
+        return redirect(url_for('trabajadores.faov_admin'))
+
+    decision = request.form.get('decision')  # 'aprobar' o 'rechazar'
+    motivo = request.form.get('motivo_rechazo', '').strip()
+
+    conexion = get_db_connection()
+    try:
+        with conexion.cursor() as cursor:
+            ahora = datetime.datetime.now()
+            if decision == 'aprobar':
+                correlativo = f"DTH-FAOV-{ahora.year}-{id:04d}"
+                cursor.execute("""
+                    UPDATE solicitud_faov
+                    SET estado = 'aprobada', correlativo = %s, fecha_aprobacion = %s,
+                        aprobada_por = %s, motivo_rechazo = NULL
+                    WHERE solicitud_faov_id = %s;
+                """, (correlativo, ahora, session['usuario_id'], id))
+                conexion.commit()
+                flash(f'Certificación FAOV #{id} aprobada con éxito. Correlativo: {correlativo}', 'success')
+            else:
+                cursor.execute("""
+                    UPDATE solicitud_faov
+                    SET estado = 'rechazada', fecha_aprobacion = %s,
+                        aprobada_por = %s, motivo_rechazo = %s
+                    WHERE solicitud_faov_id = %s;
+                """, (ahora, session['usuario_id'], motivo or 'No procedente.', id))
+                conexion.commit()
+                flash(f'Solicitud de certificación FAOV #{id} rechazada.', 'warning')
+    finally:
+        conexion.close()
+
+    return redirect(url_for('trabajadores.faov_admin'))
+
+# -------------------------------------------------------------------------
+# RRHH: Control de Períodos Vacacionales
+# -------------------------------------------------------------------------
+@trabajadores_bp.route('/vacaciones-admin')
+def vacaciones_admin():
+    if 'usuario_id' not in session or session.get('rol') not in ['directora_rrhh', 'analista_rrhh']:
+        flash('Acceso no autorizado.', 'danger')
+        return redirect(url_for('auth.dashboard'))
+
+    conexion = get_db_connection()
+    try:
+        with conexion.cursor() as cursor:
+            sql = """
+                SELECT sv.*, t.cedula, t.nombres, t.apellidos,
+                       c.nombre AS cargo_nombre, d.nombre AS departamento_nombre
+                FROM solicitud_vacaciones sv
+                INNER JOIN trabajador t ON sv.trabajador_id = t.trabajador_id
+                INNER JOIN cargo c ON t.cargo_id = c.cargo_id
+                LEFT JOIN departamento d ON c.departamento_id = d.departamento_id
+                ORDER BY sv.vacacion_id DESC;
+            """
+            cursor.execute(sql)
+            solicitudes = cursor.fetchall()
+            return render_template('trabajadores/trabajadores_vacaciones.html', solicitudes=solicitudes)
+    finally:
+        conexion.close()
+
+
+@trabajadores_bp.route('/vacaciones-admin/<int:id>/procesar', methods=['POST'])
+def procesar_vacaciones_admin(id):
+    if 'usuario_id' not in session or session.get('rol') not in ['directora_rrhh', 'analista_rrhh']:
+        return redirect(url_for('auth.dashboard'))
+
+    decision = request.form.get('decision')  # 'aprobar' o 'rechazar'
+    observaciones = request.form.get('observaciones', '').strip()
+
+    conexion = get_db_connection()
+    try:
+        with conexion.cursor() as cursor:
+            ahora = datetime.datetime.now()
+            estado_val = 'aprobada' if decision == 'aprobar' else 'rechazada'
+            cursor.execute("""
+                UPDATE solicitud_vacaciones
+                SET estado = %s, fecha_aprobacion = %s, aprobada_por = %s, observaciones = %s
+                WHERE vacacion_id = %s;
+            """, (estado_val, ahora, session['usuario_id'], observaciones, id))
+            conexion.commit()
+            flash(f'Período vacacional #{id} actualizado a estado {estado_val.upper()}.', 'success')
+    finally:
+        conexion.close()
+
+    return redirect(url_for('trabajadores.vacaciones_admin'))

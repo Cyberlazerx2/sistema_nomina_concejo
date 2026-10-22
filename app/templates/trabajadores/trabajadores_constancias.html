@@ -141,12 +141,16 @@
                         {{ e.fecha_emision.strftime('%d/%m/%Y') if e.fecha_emision and e.fecha_emision.strftime is defined else e.fecha_emision }}
                     </td>
                     <td class="text-center">
-                        {% if e.estado == 'emitida' %}
-                        <a href="{{ url_for('portal.imprimir_constancia', constancia_id=e.constancia_id) }}" target="_blank" class="btn btn-sm btn-outline-dark">
-                            📄 Ver
-                        </a>
+                        {% if e.estado in ['emitida', 'firmada_entregada'] %}
+                            <a href="{{ url_for('portal.imprimir_constancia', constancia_id=e.constancia_id) }}" target="_blank" class="btn btn-sm btn-outline-dark d-inline-flex align-items-center gap-1">
+                                <span>📄</span> Ver Documento
+                            </a>
+                        {% elif e.estado == 'rechazada' %}
+                            <span class="badge bg-danger-lt text-uppercase" title="{{ e.motivo_rechazo or 'Sin motivo' }}">
+                                Rechazada
+                            </span>
                         {% else %}
-                        <span class="badge bg-danger-lt">Rechazada</span>
+                            <span class="badge bg-secondary-lt text-uppercase">{{ e.estado }}</span>
                         {% endif %}
                     </td>
                 </tr>

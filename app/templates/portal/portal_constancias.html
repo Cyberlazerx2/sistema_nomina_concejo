@@ -60,16 +60,16 @@
                         {{ c.correlativo or 'En proceso' }}
                     </td>
                     <td class="text-center">
-                        {% if c.estado == 'pendiente' %}
+                        {% if c.estado in ['solicitada', 'pendiente'] %}
                             <span class="badge bg-warning-lt text-uppercase"><span class="badge-dot bg-warning me-1"></span>En Revisión</span>
-                        {% elif c.estado == 'emitida' %}
+                        {% elif c.estado in ['emitida', 'firmada_entregada'] %}
                             <span class="badge bg-success-lt text-uppercase"><span class="badge-dot bg-success me-1"></span>Emitida</span>
                         {% elif c.estado == 'rechazada' %}
                             <span class="badge bg-danger-lt text-uppercase" title="{{ c.motivo_rechazo or '' }}"><span class="badge-dot bg-danger me-1"></span>Rechazada</span>
                         {% endif %}
                     </td>
                     <td class="text-center">
-                        {% if c.estado == 'emitida' %}
+                        {% if c.estado in ['emitida', 'firmada_entregada'] %}
                             <a href="{{ url_for('portal.imprimir_constancia', constancia_id=c.constancia_id) }}" target="_blank" class="btn btn-sm btn-dark d-inline-flex align-items-center gap-1">
                                 <span>🖨️</span> Ver / Imprimir
                             </a>

@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}Control y Aprobación de Vacaciones - RRHH{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none mb-4">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="text-muted small text-uppercase fw-bold">Dirección de Talento Humano</div>
+            <h2 class="page-title text-dark">
+                Control y Aprobación de Vacaciones
+            </h2>
+            <div class="text-muted mt-1">
+                Concejo Municipal de Independencia · Programación de descansos legales (LOTTT Art. 190 / 199) y visto bueno institucional.
+            </div>
+        </div>
+        <div class="col-auto ms-auto d-flex gap-2">
+            <a href="{{ url_for('trabajadores.listar') }}" class="btn btn-outline-secondary">
+                ← Volver al Directorio
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-light py-3 d-flex justify-content-between align-items-center">
+        <h3 class="card-title text-dark mb-0">Solicitudes de Salida Vacacional</h3>
+        <span class="badge bg-blue-lt">{{ solicitudes|length }} trámites</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-hover">
+            <thead>
+                <tr>
+                    <th>Fecha Solicitud</th>
+                    <th>Funcionario</th>
+                    <th>Período</th>
+                    <th>Lapso Programado</th>
+                    <th class="text-center">Días Hábiles</th>
+                    <th class="text-center">Estatus</th>
+                    <th class="w-1 text-center">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in solicitudes %}
+                <tr>
+                    <td class="font-monospace small text-muted">
+                        {{ s.fecha_solicitud.strftime('%d/%m/%Y') if s.fecha_solicitud and s.fecha_solicitud.strftime is defined else s.fecha_solicitud }}
+                    </td>
+                    <td>
+                        <div class="fw-bold text-dark">{{ s.nombres }} {{ s.apellidos }}</div>
+                        <div class="text-muted small font-monospace">V-{{ s.cedula }} · {{ s.cargo_nombre }}</div>
+                        <span class="badge bg-light text-muted border font-monospace" style="font-size: 10px;">{{ s.departamento_nombre or 'Sin adscripción' }}</span>
+                    </td>
+                    <td class="font-monospace fw-bold text-dark">{{ s.periodo }}</td>
+                    <td>
+                        <div class="fw-bold text-dark small">{{ s.fecha_inicio }} al {{ s.fecha_fin }}</div>
+                    </td>
+                    <td class="text-center font-monospace fw-bold fs-5 text-primary">
+                        {{ s.dias_habiles }} día(s)
+                    </td>
+                    <td class="text-center">
+                        {% if s.estado == 'pendiente' %}
+                            <span class="badge bg-warning-lt text-uppercase"><span class="badge-dot bg-warning me-1"></span>Pendiente Revisión</span>
+                        {% elif s.estado == 'aprobada' %}
+                            <span class="badge bg-success-lt text-uppercase"><span class="badge-dot bg-success me-1"></span>Aprobada</span>
+                        {% elif s.estado == 'rechazada' %}
+                            <span class="badge bg-danger-lt text-uppercase" title="{{ s.observaciones or '' }}"><span class="badge-dot bg-danger me-1"></span>Rechazada</span>
+                        {% elif s.estado == 'disfrutada' %}
+                            <span class="badge bg-secondary-lt text-uppercase">Disfrutada</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <div class="d-flex gap-1 justify-content-center">
+                            <!-- Boleta Oficial -->
+                            <a href="{{ url_for('portal.imprimir_boleta_vacaciones', vacacion_id=s.vacacion_id) }}" target="_blank" class="btn btn-sm btn-outline-dark" title="Ver Boleta Oficial">
+                                🖨️ Boleta
+                            </a>
+
+                            {% if s.estado == 'pendiente' %}
+                                <!-- Aprobar -->
+                                <form method="POST" action="{{ url_for('trabajadores.procesar_vacaciones_admin', id=s.vacacion_id) }}" class="d-inline">
+                                    <input type="hidden" name="decision" value="aprobar">
+                                    <button type="submit" class="btn btn-sm btn-success fw-bold" onclick="return confirm('¿Aprobar formalmente el período vacacional de este funcionario?');" title="Aprobar Vacaciones">
+                                        ✓ Aprobar
+                                    </button>
+                                </form>
+
+                                <!-- Rechazar -->
+                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalRechazarVacacion{{ s.vacacion_id }}" title="Rechazar">
+                                    ✕
+                                </button>
+
+                                <!-- Modal de Rechazo -->
+                                <div class="modal modal-blur fade" id="modalRechazarVacacion{{ s.vacacion_id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered text-start">
+                                        <form method="POST" action="{{ url_for('trabajadores.procesar_vacaciones_admin', id=s.vacacion_id) }}" class="modal-content">
+                                            <input type="hidden" name="decision" value="rechazar">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title fw-bold">Rechazar Período Vacacional #{{ s.vacacion_id }}</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <p class="text-muted small">
+                                                    Indique las razones de necesidad de servicio u operativas por las cuales se difiere o deniega la fecha solicitada:
+                                                </p>
+                                                <div class="mb-3">
+                                                    <label class="form-label fw-bold">Motivo del Rechazo / Observaciones:</label>
+                                                    <textarea name="observaciones" rows="3" class="form-control" placeholder="Ej: Fechas coincidentes con cierre de ejercicio presupuestario..." required></textarea>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                <button type="submit" class="btn btn-danger fw-bold">Confirmar Rechazo</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">No hay solicitudes de vacaciones registradas.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
