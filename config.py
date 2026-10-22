@@ -1,12 +1,14 @@
 import os
-from dotenv import load_dotenv
+import pymysql
+from pymysql.cursors import DictCursor
 
-load_dotenv()
-
-class Config:
-    SECRET_KEY = os.getenv('SECRET_KEY', 'dev_secret_key_12345')
-    DB_HOST = os.getenv('DB_HOST', 'localhost')
-    DB_USER = os.getenv('DB_USER', 'root')
-    DB_PASSWORD = os.getenv('DB_PASSWORD', '')
-    DB_NAME = os.getenv('DB_NAME', 'concejo')
-    DB_PORT = int(os.getenv('DB_PORT', 3306))
+def get_db_connection():
+    return pymysql.connect(
+        host=os.environ.get('DB_HOST', 'localhost'),
+        user=os.environ.get('DB_USER', 'root'),
+        password=os.environ.get('DB_PASSWORD', 'root123'),  # Tu clave local si tienes
+        database=os.environ.get('DB_NAME', 'concejo'),
+        port=int(os.environ.get('DB_PORT', 3306)),
+        cursorclass=DictCursor,
+        autocommit=False
+    )
