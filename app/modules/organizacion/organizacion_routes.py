@@ -220,6 +220,16 @@ def editar_cargo(id):
                 """
                 cursor.execute(sql_update, (departamento_id, nombre, sueldo_base, id))
 
+                # === HOMOLOGACIÓN SALARIAL AUTOMÁTICA ===
+                # Actualiza el sueldo_base de TODOS los trabajadores activos adscritos a este cargo
+                sql_actualizar_trabajadores = """
+                    UPDATE trabajador 
+                    SET sueldo_base = %s 
+                    WHERE cargo_id = %s AND activo = true;
+                """
+                cursor.execute(sql_actualizar_trabajadores, (sueldo_base, id))
+                filas_afectadas = cursor.rowcount
+
                 cursor.execute("SELECT * FROM cargo WHERE cargo_id = %s;", (id,))
                 valor_nuevo = cursor.fetchone()
 
@@ -237,7 +247,7 @@ def editar_cargo(id):
                 ))
 
                 conexion.commit()
-                flash(f"Cargo '{nombre}' actualizado y registrado en auditoría.", 'success')
+                flash(f"Cargo '{nombre}' actualizado. Se homologó el sueldo a {filas_afectadas} trabajador(es) activo(s).", 'success')
                 return redirect(url_for('organizacion.cargos'))
 
             cursor.execute("SELECT departamento_id, nombre FROM departamento WHERE activo = true ORDER BY nombre ASC;")

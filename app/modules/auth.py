@@ -49,6 +49,7 @@ def login():
 
                 # 4. Guardar datos en la sesion web
                 session['usuario_id'] = usuario['usuario_id']
+                session['trabajador_id'] = usuario.get('trabajador_id')
                 session['nombre_usuario'] = usuario['nombre_usuario']
                 session['rol'] = usuario['rol_nombre']
 

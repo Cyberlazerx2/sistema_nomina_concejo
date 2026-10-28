@@ -129,10 +129,24 @@
                         {% endfor %}
                     </select>
                 </div>
+
                 <div class="mb-3">
                     <label class="form-label fw-bold">Descripción del Periodo:</label>
                     <input type="text" name="descripcion" class="form-control" placeholder="Ej: 2da Quincena Octubre 2026" required>
                 </div>
+
+                <!-- Campo Dinámico: Único y limpio -->
+                <div class="mb-3" id="grupo_monto_bono" style="display: none;">
+                    <label for="monto_bono" class="form-label fw-bold text-primary">
+                        Monto por Trabajador (Bs.):
+                    </label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light fw-bold">Bs.</span>
+                        <input type="number" step="0.01" min="0" class="form-control fw-bold" id="monto_bono" name="monto_bono" placeholder="0.00">
+                    </div>
+                    <div id="alerta_legal_monto" class="mt-2 small"></div>
+                </div>
+
                 <div class="row g-2">
                     <div class="col-6">
                         <label class="form-label fw-bold">Fecha Inicio:</label>
@@ -153,7 +167,7 @@
 </div>
 
 <!-- ========================================== -->
-<!-- 2. MODAL SUAVE: CONFIRMAR ELIMINACIÓN -->
+<!-- 2. MODAL: CONFIRMAR ELIMINACIÓN -->
 <!-- ========================================== -->
 <div class="modal modal-blur fade" id="modalConfirmarEliminar" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
@@ -204,18 +218,61 @@
 
 {% block scripts %}
 <script>
-    function confirmarEliminar(urlAction, itemNombre) {
-        document.getElementById('formEliminarModal').action = urlAction;
-        document.getElementById('modalEliminarTexto').innerHTML = '¿Está seguro de eliminar definitivamente <strong>' + itemNombre + '</strong>?';
-        var modal = new bootstrap.Modal(document.getElementById('modalConfirmarEliminar'));
-        modal.show();
+document.addEventListener('DOMContentLoaded', function() {
+    const tiposConfig = {{ tipos_info_json|safe if tipos_info_json is defined else '{}' }};
+    const selectTipo = document.querySelector('select[name="tipo_personal"]');
+    const grupoBono = document.getElementById('grupo_monto_bono');
+    const inputBono = document.getElementById('monto_bono');
+    const alertaLegal = document.getElementById('alerta_legal_monto');
+
+    function actualizarVisibilidadMonto() {
+        if (!selectTipo || !grupoBono || !inputBono) return;
+        const cod = selectTipo.value;
+        const config = tiposConfig[cod];
+
+        // Se considera manual si está configurado en BD o si el código es de bono/especial
+        const esManual = config ? config.requiere_monto_manual : (
+            cod.includes('bono') || cod.includes('cestaticket') || cod.includes('especial')
+        );
+
+        if (esManual) {
+            grupoBono.style.display = 'block';
+            inputBono.setAttribute('required', 'required');
+            if (!inputBono.value) {
+                inputBono.value = '30302.00';
+            }
+
+            if (config && config.aplica_leyes_sociales) {
+                alertaLegal.innerHTML = '<span class="badge bg-warning text-dark">⚖️ Asignación Salarial (Art. 104 LOTTT)</span> <span class="text-muted d-block mt-1">Se deducirán aportes de IVSS, FAOV, SPF y Jubilación sobre este monto.</span>';
+            } else {
+                alertaLegal.innerHTML = '<span class="badge bg-success">🛡️ Asignación Neta (Art. 105 LOTTT)</span> <span class="text-muted d-block mt-1">100% libre de retenciones por decreto.</span>';
+            }
+        } else {
+            grupoBono.style.display = 'none';
+            inputBono.removeAttribute('required');
+            inputBono.value = '';
+            if (alertaLegal) alertaLegal.innerHTML = '';
+        }
     }
 
-    function abrirModalSabana(urlIframe, titulo) {
-        document.getElementById('tituloModalSabana').textContent = '📊 Sábana Consolidada - ' + titulo;
-        document.getElementById('iframeSabana').src = urlIframe;
-        var modal = new bootstrap.Modal(document.getElementById('modalSabanaGenerica'));
-        modal.show();
+    if (selectTipo) {
+        selectTipo.addEventListener('change', actualizarVisibilidadMonto);
+        actualizarVisibilidadMonto();
     }
+});
+
+function confirmarEliminar(urlAction, itemNombre) {
+    document.getElementById('formEliminarModal').action = urlAction;
+    document.getElementById('modalEliminarTexto').innerHTML = '¿Está seguro de eliminar definitivamente <strong>' + itemNombre + '</strong>?';
+    var modal = new bootstrap.Modal(document.getElementById('modalConfirmarEliminar'));
+    modal.show();
+}
+
+function abrirModalSabana(urlIframe, titulo) {
+    document.getElementById('tituloModalSabana').textContent = '📊 Sábana Consolidada - ' + titulo;
+    document.getElementById('iframeSabana').src = urlIframe;
+    var modal = new bootstrap.Modal(document.getElementById('modalSabanaGenerica'));
+    modal.show();
+}
 </script>
 {% endblock %}
