@@ -1,4 +1,9 @@
-from flask import Flask, redirect, url_for, session
+import os
+import sys
+from flask import Flask, redirect, request, url_for, session
+
+# Garantiza que busque config.py en la raíz y no dentro de app/modules/config
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from config import Config
 from app.database import get_db_connection
 
@@ -8,6 +13,9 @@ def create_app():
 
     @app.before_request
     def revalidar_sesion():
+        if request.endpoint and request.endpoint == 'static':
+            return
+
         if 'usuario_id' in session:
             conexion = get_db_connection()
             try:

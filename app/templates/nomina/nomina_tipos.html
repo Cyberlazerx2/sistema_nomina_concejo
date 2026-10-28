@@ -37,6 +37,7 @@
                     <th>Denominación de la Nómina</th>
                     <th>Frecuencia</th>
                     <th class="text-center">Régimen de Deducciones</th>
+                    <th class="text-center">Modalidad de Cálculo</th>
                     <th class="text-center">Alcance de Personal</th>
                     <th class="text-center">Trabajadores</th>
                     <th class="text-center">Estatus</th>
@@ -59,6 +60,17 @@
                         {% else %}
                             <span class="badge bg-purple-lt" title="Se paga íntegro sin deducciones parafiscales">
                                 Pago Neto (Sin Retenciones)
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if t.requiere_monto_manual %}
+                            <span class="badge bg-warning-lt fw-bold" title="Exige ingresar el monto manual por decreto">
+                                ✍️ Monto Manual
+                            </span>
+                        {% else %}
+                            <span class="badge bg-azure-lt" title="Calcula según Tabulador ONAPRE / RAC">
+                                📐 Tabulador RAC
                             </span>
                         {% endif %}
                     </td>
@@ -86,7 +98,7 @@
                     <td class="text-center">
                         <div class="d-flex gap-1 justify-content-center">
                             <button type="button" class="btn btn-sm btn-outline-secondary" title="Modificar Nómina"
-                                onclick="abrirModalEditar('{{ t.codigo }}', '{{ t.nombre }}', '{{ t.periodicidad }}', {{ 1 if t.aplica_leyes_sociales else 0 }}, {{ 1 if t.aplica_a_todos else 0 }})">
+                                onclick="abrirModalEditar('{{ t.codigo }}', '{{ t.nombre|replace("'", "\\'") }}', '{{ t.periodicidad }}', {{ 1 if t.aplica_leyes_sociales else 0 }}, {{ 1 if t.aplica_a_todos else 0 }}, {{ 1 if t.requiere_monto_manual else 0 }})">
                                 ✏️
                             </button>
                             <form method="POST" action="{{ url_for('nomina.toggle_tipo', codigo=t.codigo) }}" class="d-inline">
@@ -103,7 +115,7 @@
     </div>
 </div>
 
-<!-- Modal Amigable para RRHH (Sin campos técnicos de BD) -->
+<!-- Modal Amigable para RRHH -->
 <div class="modal modal-blur fade" id="modalTipoNomina" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <form method="POST" action="{{ url_for('nomina.guardar_tipo') }}" class="modal-content">
@@ -138,6 +150,17 @@
                     </small>
                 </div>
 
+                <!-- Interruptor de Monto Manual dentro del Modal -->
+                <div class="mb-3 pt-2 border-top">
+                    <label class="form-check form-switch mb-1">
+                        <input class="form-check-input" type="checkbox" name="requiere_monto_manual" id="modalRequiereManual" value="1">
+                        <span class="form-check-label fw-bold">Requiere Asignación de Monto Manual por Decreto</span>
+                    </label>
+                    <small class="text-muted d-block ps-4">
+                        Active esta casilla si esta nómina (bonos, decretos o retroactivos) exige ingresar el monto a pagar manualmente al momento de elaborarla.
+                    </small>
+                </div>
+
                 <div class="mb-2 pt-2 border-top">
                     <label class="form-check form-switch mb-1">
                         <input class="form-check-input" type="checkbox" name="aplica_a_todos" id="modalAplicaTodos" value="1">
@@ -165,16 +188,18 @@
         document.getElementById('modalNombre').value = '';
         document.getElementById('modalPeriodicidad').value = 'quincenal';
         document.getElementById('modalLeyesSociales').checked = true;
+        document.getElementById('modalRequiereManual').checked = false;
         document.getElementById('modalAplicaTodos').checked = false;
         document.getElementById('modalBotonSubmit').textContent = 'Guardar Nómina';
     }
 
-    function abrirModalEditar(codigo, nombre, periodicidad, leyes, todos) {
+    function abrirModalEditar(codigo, nombre, periodicidad, leyes, todos, requiereManual) {
         document.getElementById('modalTitulo').textContent = 'Editar Nómina';
         document.getElementById('modalCodigoOriginal').value = codigo;
         document.getElementById('modalNombre').value = nombre;
         document.getElementById('modalPeriodicidad').value = periodicidad;
         document.getElementById('modalLeyesSociales').checked = (leyes === 1);
+        document.getElementById('modalRequiereManual').checked = (requiereManual === 1 || requiereManual === true);
         document.getElementById('modalAplicaTodos').checked = (todos === 1);
         document.getElementById('modalBotonSubmit').textContent = 'Guardar Cambios';
         var modal = new bootstrap.Modal(document.getElementById('modalTipoNomina'));

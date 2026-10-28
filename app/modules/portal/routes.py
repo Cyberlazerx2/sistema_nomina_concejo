@@ -95,9 +95,9 @@ def inicio():
             dias_disfrutados = 0
             try:
                 cursor.execute("""
-                    SELECT COALESCE(SUM(dias_solicitados), 0) AS total_disfrutados
+                    SELECT COALESCE(SUM(dias_habiles), 0) AS total_disfrutados
                     FROM solicitud_vacaciones
-                    WHERE trabajador_id = %s AND estado = 'aprobada';
+                    WHERE trabajador_id = %s AND estado IN ('aprobada', 'disfrutada');
                 """, (trabajador['trabajador_id'],))
                 res_vac = cursor.fetchone()
                 if res_vac:
@@ -458,7 +458,7 @@ def imprimir_constancia(constancia_id):
                 return redirect(url_for('portal.constancias'))
 
             # Sueldo mensual base institucional (quincena * 2)
-            sueldo_base_mensual = float(constancia['sueldo_base'] or 158.00) * 2
+            sueldo_base_mensual = float(constancia['sueldo_base'] or 0.00)
             sueldo_en_letras = numero_a_letras(sueldo_base_mensual)
 
             meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']

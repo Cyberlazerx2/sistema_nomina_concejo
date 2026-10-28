@@ -4,22 +4,13 @@ import datetime
 import json
 from app.database import get_db_connection
 
-config_bp = Blueprint('config', __name__)
-
 # -------------------------------------------------------------------------
 # 1. TABLA GENERAL DE CONCEPTOS (Activos e Inactivos)
 # Rol exclusivo: directora_rrhh
 # -------------------------------------------------------------------------
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash
-from app.database import get_db_connection
-
 config_bp = Blueprint('config', __name__)
 
 def formatear_numero_limpio(val):
-    """
-    Elimina los ceros innecesarios a la derecha de un número decimal:
-    4.0000 -> '4' | 0.5000 -> '0.5' | 47.0500 -> '47.05' | 0.0025 -> '0.0025'
-    """
     if val is None:
         return "0"
     try:
@@ -28,7 +19,6 @@ def formatear_numero_limpio(val):
         return formateado if formateado != "" else "0"
     except Exception:
         return str(val)
-
 
 @config_bp.route('/conceptos', methods=['GET', 'POST'])
 def conceptos():
@@ -43,14 +33,11 @@ def conceptos():
             cursor.execute("DESCRIBE concepto;")
             columnas_reales = [col['Field'] for col in cursor.fetchall()]
 
-            col_nombre = 'nombre' if 'nombre' in columnas_reales else ('descripcion' if 'descripcion' in columnas_reales else None)
-            col_calc = 'tipo_calculo' if 'tipo_calculo' in columnas_reales else ('formula' if 'formula' in columnas_reales else None)
-            col_valor = 'valor' if 'valor' in columnas_reales else ('monto' if 'monto' in columnas_reales else None)
+            col_nombre = 'nombre' if 'nombre' in columnas_reales else None
+            col_calc = 'metodo' if 'metodo' in columnas_reales else ('tipo_calculo' if 'tipo_calculo' in columnas_reales else None)
+            col_valor = 'valor' if 'valor' in columnas_reales else None
             col_activo = 'activo' if 'activo' in columnas_reales else None
 
-            # -----------------------------------------------------------------
-            # Guardado masivo
-            # -----------------------------------------------------------------
             if request.method == 'POST':
                 conceptos_ids = request.form.getlist('concepto_id[]')
                 nombres = request.form.getlist('nombre[]')
@@ -87,36 +74,28 @@ def conceptos():
 
                     conexion.commit()
                     flash('Parametrización salarial actualizada exitosamente en bloque.', 'success')
-                else:
-                    flash('No se encontraron columnas modificables en la tabla.', 'warning')
 
                 return redirect(url_for('config.conceptos'))
 
-            # -----------------------------------------------------------------
-            # Carga y formateo de datos para la vista
-            # -----------------------------------------------------------------
             cursor.execute("SELECT * FROM concepto ORDER BY tipo ASC, concepto_id ASC;")
             todos = cursor.fetchall()
 
             for c in todos:
-                c['nombre_display'] = c.get('nombre') or c.get('descripcion') or 'Concepto General'
-                c['codigo_display'] = c.get('codigo') or c.get('codigo_concepto') or f"CON-{c.get('concepto_id')}"
-                c['tipo_calculo_display'] = c.get('tipo_calculo') or c.get('formula') or 'porcentaje'
+                c['nombre_display'] = c.get('nombre') or 'Concepto General'
+                c['codigo_display'] = c.get('codigo') or f"CON-{c.get('concepto_id')}"
+                c['tipo_calculo_display'] = c.get('metodo') or c.get('tipo_calculo') or 'porcentaje'
 
-                val_raw = c.get('valor') if c.get('valor') is not None else (c.get('monto') or 0.0)
+                val_raw = c.get('valor', 0.0)
                 c['valor_limpio'] = formatear_numero_limpio(val_raw)
                 c['activo_display'] = bool(c.get('activo', 1))
 
-                # Etiqueta para la columna "Vigente Actual"
                 if c['tipo_calculo_display'] == 'porcentaje':
                     c['etiqueta_actual'] = f"{c['valor_limpio']}%"
-                elif c['tipo_calculo_display'] == 'dias':
-                    c['etiqueta_actual'] = f"{c['valor_limpio']} d"
                 else:
                     c['etiqueta_actual'] = f"Bs. {c['valor_limpio']}"
 
-            asignaciones = [c for c in todos if str(c.get('tipo', '')).strip().lower() in ['asignacion', 'asignación']]
-            deducciones = [c for c in todos if str(c.get('tipo', '')).strip().lower() in ['deduccion', 'deducción']]
+            asignaciones = [c for c in todos if str(c.get('tipo', '')).strip().lower() == 'asignacion']
+            deducciones = [c for c in todos if str(c.get('tipo', '')).strip().lower() == 'deduccion']
 
             return render_template(
                 'config/config_conceptos.html',
