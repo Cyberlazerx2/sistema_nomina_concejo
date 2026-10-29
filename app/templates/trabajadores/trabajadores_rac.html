@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}Asignación Institucional (RAC) y Nómina - RRHH{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none mb-4">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="text-muted small text-uppercase fw-bold">Registro de Asignación de Cargos (RAC)</div>
+            <h2 class="page-title text-dark">
+                🏛️ Gestión de Plantilla y Padrón Nominal
+            </h2>
+            <div class="text-muted mt-1">
+                Concejo Municipal de Independencia · Reasignación inmediata de cargos, escala salarial y tipo de nómina.
+            </div>
+        </div>
+        <div class="col-auto ms-auto d-flex gap-2">
+            <a href="{{ url_for('trabajadores.listar') }}" class="btn btn-outline-secondary">
+                ← Directorio de Personal
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-light py-3 d-flex justify-content-between align-items-center">
+        <h3 class="card-title text-dark mb-0">Plantilla Activa del Concejo Municipal</h3>
+        <span class="badge bg-blue-lt">{{ plantilla|length }} funcionarios registrados</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-hover">
+            <thead>
+                <tr>
+                    <th>Funcionario</th>
+                    <th>C.I.</th>
+                    <th>Cargo Actual</th>
+                    <th>Padrón / Tipo Nómina</th>
+                    <th class="text-end">Sueldo Base</th>
+                    <th class="w-1 text-center">Acción Rápida</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in plantilla %}
+                <tr>
+                    <td class="fw-bold text-dark">{{ t.nombres }} {{ t.apellidos }}</td>
+                    <td class="font-monospace">V-{{ t.cedula }}</td>
+                    <td>
+                        <div class="fw-semibold text-dark">{{ t.cargo_nombre }}</div>
+                        <div class="text-muted small">{{ t.departamento_nombre }}</div>
+                    </td>
+                    <td>
+                        <span class="badge bg-secondary-lt text-uppercase font-monospace" style="font-size: 11px;">
+                            {{ t.tipo_nomina_nombre or t.tipo_personal|replace('_', ' ') }}
+                        </span>
+                    </td>
+                    <td class="text-end font-monospace fw-bold text-dark">
+                        Bs. {{ "{:,.2f}".format(t.sueldo_base|float) }}
+                    </td>
+                    <td class="text-center">
+                        <button type="button" class="btn btn-sm btn-outline-primary fw-bold" 
+                                data-bs-toggle="modal" data-bs-target="#modalRac{{ t.trabajador_id }}">
+                            ✏️ Reasignar RAC
+                        </button>
+
+                        <!-- Modal de Edición Rápida -->
+                        <div class="modal modal-blur fade" id="modalRac{{ t.trabajador_id }}" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered text-start">
+                                <form method="POST" action="{{ url_for('trabajadores.rac_asignacion') }}" class="modal-content">
+                                    <input type="hidden" name="trabajador_id" value="{{ t.trabajador_id }}">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title fw-bold">Reasignar RAC: {{ t.nombres }} {{ t.apellidos }}</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="mb-3">
+                                            <label class="form-label fw-bold">Cargo Nominal:</label>
+                                            <select name="cargo_id" class="form-select select-cargo-rac" required data-target="sueldo{{ t.trabajador_id }}">
+                                                {% for c in cargos %}
+                                                    <option value="{{ c.cargo_id }}" data-sueldo="{{ c.sueldo_base }}" {% if c.cargo_id == t.cargo_id %}selected{% endif %}>
+                                                        {{ c.nombre }} (Ref: Bs. {{ "{:,.2f}".format(c.sueldo_base|float) }})
+                                                    </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label fw-bold">Tipo de Nómina al que pertenece:</label>
+                                            <select name="tipo_personal" class="form-select" required>
+                                                {% for cod, nom in tipos_nomina %}
+                                                    <option value="{{ cod }}" {% if cod == t.tipo_personal %}selected{% endif %}>{{ nom }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label fw-bold">Sueldo Base Mensual (Bs.):</label>
+                                            <input type="number" step="0.01" name="sueldo_base" id="sueldo{{ t.trabajador_id }}" class="form-control font-monospace fw-bold" value="{{ t.sueldo_base }}" required>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-primary fw-bold">Guardar Reasignación</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.select-cargo-rac').forEach(function(select) {
+    select.addEventListener('change', function() {
+        const targetId = this.getAttribute('data-target');
+        const inputSueldo = document.getElementById(targetId);
+        const opt = this.options[this.selectedIndex];
+        if (opt && opt.getAttribute('data-sueldo')) {
+            inputSueldo.value = parseFloat(opt.getAttribute('data-sueldo')).toFixed(2);
+        }
+    });
+});
+</script>
+{% endblock %}

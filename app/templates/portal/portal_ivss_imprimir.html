@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Certificación de Cotizaciones IVSS - {{ s.correlativo }}</title>
+    <style>
+        body { font-family: 'Times New Roman', serif; font-size: 11pt; color: #111; margin: 30px; line-height: 1.4; }
+        .header { text-align: center; border-bottom: 2px solid #222; padding-bottom: 8px; margin-bottom: 20px; }
+        .header h3 { margin: 0; font-size: 12pt; text-transform: uppercase; }
+        .header h4 { margin: 3px 0; font-size: 11pt; font-weight: normal; }
+        .correlativo { text-align: right; font-weight: bold; margin-bottom: 15px; font-size: 10pt; }
+        .titulo { text-align: center; font-size: 13pt; font-weight: bold; text-decoration: underline; margin-bottom: 20px; text-transform: uppercase; }
+        p { text-align: justify; margin-bottom: 12px; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 9.5pt; }
+        th, td { border: 1px solid #444; padding: 4px 6px; }
+        th { background: #f0f0f0; text-align: center; font-weight: bold; }
+        .firmas { margin-top: 50px; text-align: center; }
+        .linea-firma { width: 250px; border-top: 1px solid #000; margin: 0 auto; padding-top: 4px; }
+        @media print {
+            .no-print { display: none; }
+            body { margin: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print" style="margin-bottom: 15px; text-align: right;">
+        <button onclick="window.print()" style="padding: 8px 16px; background: #004085; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+            🖨️ Imprimir Certificación
+        </button>
+    </div>
+
+    <div class="header">
+        <h3>República Bolivariana de Venezuela</h3>
+        <h4>Estado Yaracuy · Municipio Independencia</h4>
+        <h3>Concejo Municipal de Independencia</h3>
+        <h4>Dirección de Talento Humano</h4>
+        <div style="font-size: 9pt; margin-top: 4px;">RIF: G-20000153-0 · N° Patronal IVSS: D-19020042</div>
+    </div>
+
+    <div class="correlativo">CONSTANCIA N°: {{ s.correlativo }}</div>
+
+    <div class="titulo">Certificación de Cotizaciones y Cuenta Individual (IVSS)</div>
+
+    <p>
+        Quien suscribe, la <strong>Directora de Talento Humano del Concejo Municipal de Independencia del Estado Yaracuy</strong>, por medio de la presente hace constar que el (la) ciudadano(a) <strong>{{ t.nombres }} {{ t.apellidos }}</strong>, titular de la Cédula de Identidad N° <strong>V-{{ t.cedula }}</strong>, quien presta sus servicios en esta institución pública desempeñando el cargo de <strong>{{ t.cargo_nombre }}</strong> adscrito(a) a la <strong>{{ t.departamento_nombre }}</strong>, registra formalmente cotizaciones al <strong>Instituto Venezolano de los Seguros Sociales (IVSS)</strong> bajo la cuenta patronal de este órgano edilicio durante el ejercicio fiscal <strong>{{ anio }}</strong>.
+    </p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>N°</th>
+                <th>Período de Nómina</th>
+                <th>Lapso Quincenal</th>
+                <th>Semanas</th>
+                <th>Retención Trabajador (4%)</th>
+                <th>Aporte Patronal (9%)</th>
+                <th>Total Aportado (13%)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for d in detalles %}
+            <tr>
+                <td style="text-align: center;">{{ loop.index }}</td>
+                <td>{{ d.descripcion }}</td>
+                <td style="text-align: center; font-size: 8.5pt;">{{ d.fecha_inicio }} al {{ d.fecha_fin }}</td>
+                <td style="text-align: center;">{{ d.semanas }}</td>
+                <td style="text-align: right;">Bs. {{ "{:,.2f}".format(d.retencion_trabajador) }}</td>
+                <td style="text-align: right;">Bs. {{ "{:,.2f}".format(d.aporte_patronal) }}</td>
+                <td style="text-align: right; font-weight: bold;">Bs. {{ "{:,.2f}".format(d.total_depositado) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr style="background: #f8f9fa; font-weight: bold;">
+                <td colspan="3" style="text-align: right;">TOTALES ACUMULADOS {{ anio }}:</td>
+                <td style="text-align: center;">{{ total_semanas }} sem</td>
+                <td style="text-align: right;">Bs. {{ "{:,.2f}".format(total_retenido) }}</td>
+                <td style="text-align: right;">Bs. {{ "{:,.2f}".format(total_patrono) }}</td>
+                <td style="text-align: right;">Bs. {{ "{:,.2f}".format(total_general) }}</td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <p>
+        Constancia que se expide a solicitud de la parte interesada para fines de: <strong>{{ s.motivo or 'Trámite Oficial ante el IVSS' }}</strong>, en la ciudad de Independencia, {{ fecha_texto }}.
+    </p>
+
+    <div class="firmas">
+        <div class="linea-firma">
+            <strong>Lcda. Elena Pérez</strong><br>
+            Directora de Talento Humano<br>
+            Concejo Municipal de Independencia
+        </div>
+    </div>
+</body>
+</html>

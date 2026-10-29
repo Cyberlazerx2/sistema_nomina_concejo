@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}Trámite de Jubilación - Portal del Trabajador{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none mb-4">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="text-muted small text-uppercase fw-bold">Previsión y Retiro</div>
+            <h2 class="page-title text-dark">
+                📜 Solicitud de Jubilación Reglamentaria
+            </h2>
+            <div class="text-muted mt-1">
+                Concejo Municipal de Independencia · Consulta de requisitos y registro de solicitud formal de pase a retiro.
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tarjetas de Antigüedad y Cumplimiento -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small fw-bold text-uppercase">Años de Servicio</div>
+                <div class="h2 mb-0 font-monospace text-primary fw-bold">{{ anos_servicio }} años</div>
+                <div class="text-muted small mt-1">Ingreso: {{ t.fecha_ingreso }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small fw-bold text-uppercase">Edad Actual</div>
+                <div class="h2 mb-0 font-monospace text-dark fw-bold">{{ edad }} años</div>
+                <div class="text-muted small mt-1">Fecha Nac.: {{ t.fecha_nacimiento or 'No registrada' }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-6">
+        <div class="card border-0 shadow-sm {% if cumple %}bg-green-lt{% else %}bg-warning-lt{% endif %}">
+            <div class="card-body">
+                <div class="text-muted small fw-bold text-uppercase">Estatus Reglamentario</div>
+                <div class="h3 mb-0 fw-bold {% if cumple %}text-success{% else %}text-warning{% endif %}">
+                    {% if cumple %}
+                        ✓ Cumple con los requisitos para Jubilación (25+ años)
+                    {% else %}
+                        ⏳ En acumulación de tiempo de servicio reglamentario
+                    {% endif %}
+                </div>
+                <div class="small mt-1 text-muted">
+                    Conforme al Estatuto sobre el Régimen de Jubilaciones de la Función Pública.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Formulario de Solicitud Voluntaria -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-light py-3">
+        <h3 class="card-title text-dark mb-0">Emitir Solicitud de Pase a Retiro</h3>
+    </div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('portal.jubilacion') }}">
+            <div class="mb-3">
+                <label class="form-label fw-bold">Motivo o Fundamentación:</label>
+                <textarea name="motivo" class="form-control" rows="3" required placeholder="Exponga su manifestación voluntaria de acogerse al beneficio de jubilación..."></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary fw-bold">
+                Enviar Solicitud a la Dirección de RRHH
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Historial de Trámites -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-light py-3">
+        <h3 class="card-title text-dark mb-0">Historial de Trámites de Jubilación</h3>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-hover">
+            <thead>
+                <tr>
+                    <th>N° Trámite</th>
+                    <th>Modalidad</th>
+                    <th>Fecha Registro</th>
+                    <th>Pensión Aprobada</th>
+                    <th class="text-center">Estatus</th>
+                    <th class="text-center">Resolución</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in solicitudes %}
+                <tr>
+                    <td class="font-monospace text-muted">#{{ s.jubilacion_id }}</td>
+                    <td class="text-capitalize">{{ s.tipo_tramite|replace('_', ' ') }}</td>
+                    <td class="text-muted small">{{ s.fecha_solicitud }}</td>
+                    <td class="font-monospace fw-bold text-success">
+                        {% if s.monto_pension and s.monto_pension|float > 0 %}
+                            Bs. {{ "{:,.2f}".format(s.monto_pension|float) }} ({{ s.porcentaje_jubilacion }}%)
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if s.estado == 'aprobada' %}
+                            <span class="badge bg-success-lt">Jubilado Oficial · {{ s.correlativo }}</span>
+                        {% elif s.estado == 'rechazada' %}
+                            <span class="badge bg-danger-lt">Rechazada</span>
+                        {% else %}
+                            <span class="badge bg-warning-lt">En Evaluación RRHH</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if s.estado == 'aprobada' %}
+                            <a href="{{ url_for('portal.imprimir_resolucion_jubilacion', jubilacion_id=s.jubilacion_id) }}" target="_blank" class="btn btn-sm btn-outline-dark">
+                                🖨️ Ver Resolución
+                            </a>
+                        {% else %}
+                            <span class="text-muted small">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">
+                        No registra solicitudes de jubilación formalizadas.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

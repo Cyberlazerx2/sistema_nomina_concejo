@@ -3,7 +3,7 @@ import uuid
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from app.database import get_db_connection
 from app.modules.portal.numero_letras import numero_a_letras
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 portal_bp = Blueprint('portal', __name__)
 
@@ -869,5 +869,319 @@ def imprimir_boleta_vacaciones(vacacion_id):
             v = cursor.fetchone()
             hoy = datetime.date.today()
             return render_template('portal/portal_vacaciones_boleta.html', v=v, hoy=hoy)
+    finally:
+        conexion.close()
+        
+# -------------------------------------------------------------------------
+# IVSS: Estado de Cuenta Individual y Cotizaciones del Seguro Social
+# -------------------------------------------------------------------------
+@portal_bp.route('/ivss', methods=['GET', 'POST'])
+def ivss_estado_cuenta():
+    if 'usuario_id' not in session or session.get('rol') != 'trabajador':
+        flash('Acceso restringido al portal del funcionario.', 'danger')
+        return redirect(url_for('auth.login'))
+
+    anio_actual = datetime.date.today().year
+    anio_seleccionado = request.args.get('anio', default=str(anio_actual))
+
+    conexion = get_db_connection()
+    try:
+        with conexion.cursor() as cursor:
+            t_id = obtener_trabajador_id_actual(cursor)
+            if not t_id:
+                flash('Cuenta no vinculada a una ficha de trabajador.', 'danger')
+                return redirect(url_for('portal.inicio'))
+
+            # Procesar solicitud de constancia de cotizaciones
+            if request.method == 'POST':
+                anio_sol = request.form.get('anio_solicitud', anio_actual)
+                motivo = request.form.get('motivo', '').strip()
+
+                cursor.execute("""
+                    INSERT INTO solicitud_ivss (trabajador_id, anio, motivo, estado, fecha_solicitud)
+                    VALUES (%s, %s, %s, 'solicitada', NOW());
+                """, (t_id, anio_sol, motivo or 'Trámite de Cuenta Individual / Pensión IVSS'))
+                conexion.commit()
+                flash('Solicitud de Certificación IVSS remitida a la Dirección de Recursos Humanos.', 'success')
+                return redirect(url_for('portal.ivss_estado_cuenta', anio=anio_sol))
+
+            # Datos del trabajador
+            cursor.execute("""
+                SELECT t.*, c.nombre AS cargo_nombre, d.nombre AS departamento_nombre
+                FROM trabajador t
+                INNER JOIN cargo c ON t.cargo_id = c.cargo_id
+                LEFT JOIN departamento d ON c.departamento_id = d.departamento_id
+                WHERE t.trabajador_id = %s;
+            """, (t_id,))
+            trabajador = cursor.fetchone()
+
+            # Desglose de retenciones IVSS en nóminas aprobadas del año seleccionado
+            sql_ivss = """
+                SELECT nd.monto AS retencion_trabajador,
+                       pn.periodo_id, pn.descripcion, pn.fecha_inicio, pn.fecha_fin,
+                       pn.tipo_nomina, nt.dias_trabajados, YEAR(pn.fecha_fin) AS anio
+                FROM nomina_detalle nd
+                INNER JOIN nomina_trabajador nt ON nd.nomina_trabajador_id = nt.nomina_trabajador_id
+                INNER JOIN periodo_nomina pn ON nt.periodo_id = pn.periodo_id
+                WHERE nt.trabajador_id = %s 
+                  AND nd.codigo_concepto = 'IVSS'
+                  AND pn.estado IN ('aprobada', 'procesada_patria')
+                  AND YEAR(pn.fecha_fin) = %s
+                ORDER BY pn.fecha_fin DESC;
+            """
+            cursor.execute(sql_ivss, (t_id, anio_seleccionado))
+            registros_raw = cursor.fetchall()
+
+            # Años disponibles con retenciones registradas
+            cursor.execute("""
+                SELECT DISTINCT YEAR(pn.fecha_fin) AS anio
+                FROM nomina_detalle nd
+                INNER JOIN nomina_trabajador nt ON nd.nomina_trabajador_id = nt.nomina_trabajador_id
+                INNER JOIN periodo_nomina pn ON nt.periodo_id = pn.periodo_id
+                WHERE nt.trabajador_id = %s AND nd.codigo_concepto = 'IVSS'
+                  AND pn.estado IN ('aprobada', 'procesada_patria')
+                ORDER BY anio DESC;
+            """, (t_id,))
+            anios_disponibles = [row['anio'] for row in cursor.fetchall()]
+            if not anios_disponibles:
+                anios_disponibles = [anio_actual]
+
+            movimientos = []
+            total_trabajador = Decimal('0.00')
+            total_patronal = Decimal('0.00')
+            gran_total_ivss = Decimal('0.00')
+            total_semanas_cotizadas = 0
+
+            for r in registros_raw:
+                ret_trab = Decimal(str(r['retencion_trabajador']))
+                # Riesgo Mínimo (9% patrono / 4% trabajador = factor 2.25)
+                aporte_pat = (ret_trab * Decimal('2.25')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                aporte_tot = (ret_trab * Decimal('3.25')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                
+                # Cada quincena liquidada representa 2 semanas cotizadas
+                semanas = 2 if int(r.get('dias_trabajados') or 15) <= 15 else 4
+                total_semanas_cotizadas += semanas
+
+                total_trabajador += ret_trab
+                total_patronal += aporte_pat
+                gran_total_ivss += aporte_tot
+
+                movimientos.append({
+                    'periodo': r['descripcion'],
+                    'fecha_inicio': r['fecha_inicio'],
+                    'fecha_fin': r['fecha_fin'],
+                    'tipo_nomina': r['tipo_nomina'],
+                    'semanas': semanas,
+                    'retencion_trabajador': ret_trab,
+                    'aporte_patronal': aporte_pat,
+                    'total_depositado': aporte_tot
+                })
+
+            # Historial de solicitudes de certificación de este funcionario
+            cursor.execute("""
+                SELECT * FROM solicitud_ivss
+                WHERE trabajador_id = %s
+                ORDER BY solicitud_ivss_id DESC;
+            """, (t_id,))
+            solicitudes = cursor.fetchall()
+
+            return render_template(
+                'portal/portal_ivss.html',
+                trabajador=trabajador,
+                movimientos=movimientos,
+                total_trabajador=total_trabajador,
+                total_patronal=total_patronal,
+                gran_total_ivss=gran_total_ivss,
+                total_semanas=total_semanas_cotizadas,
+                anios=anios_disponibles,
+                anio_activo=str(anio_seleccionado),
+                solicitudes=solicitudes
+            )
+    finally:
+        conexion.close()
+
+
+# -------------------------------------------------------------------------
+# IVSS: Constancia Oficial de Retenciones y Cuenta Individual
+# -------------------------------------------------------------------------
+@portal_bp.route('/ivss/imprimir/<int:solicitud_id>')
+def imprimir_constancia_ivss(solicitud_id):
+    if 'usuario_id' not in session:
+        return redirect(url_for('auth.login'))
+
+    conexion = get_db_connection()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute("""
+                SELECT si.*, t.cedula, t.nombres, t.apellidos, t.fecha_ingreso,
+                       c.nombre AS cargo_nombre, d.nombre AS departamento_nombre,
+                       u.nombre_usuario AS autorizador_nombre
+                FROM solicitud_ivss si
+                INNER JOIN trabajador t ON si.trabajador_id = t.trabajador_id
+                INNER JOIN cargo c ON t.cargo_id = c.cargo_id
+                LEFT JOIN departamento d ON c.departamento_id = d.departamento_id
+                LEFT JOIN usuario u ON si.aprobada_por = u.usuario_id
+                WHERE si.solicitud_ivss_id = %s;
+            """, (solicitud_id,))
+            solicitud = cursor.fetchone()
+
+            if not solicitud or solicitud['estado'] != 'aprobada':
+                flash('La certificación solicitada aún no ha sido aprobada por Recursos Humanos.', 'warning')
+                return redirect(url_for('portal.ivss_estado_cuenta'))
+
+            t_id = obtener_trabajador_id_actual(cursor)
+            if session.get('rol') == 'trabajador' and solicitud['trabajador_id'] != t_id:
+                flash('No tiene autorización para visualizar este documento.', 'danger')
+                return redirect(url_for('portal.ivss_estado_cuenta'))
+
+            sql_ivss = """
+                SELECT nd.monto AS retencion_trabajador,
+                       pn.periodo_id, pn.descripcion, pn.fecha_fin, pn.fecha_inicio,
+                       nt.dias_trabajados
+                FROM nomina_detalle nd
+                INNER JOIN nomina_trabajador nt ON nd.nomina_trabajador_id = nt.nomina_trabajador_id
+                INNER JOIN periodo_nomina pn ON nt.periodo_id = pn.periodo_id
+                WHERE nt.trabajador_id = %s 
+                  AND nd.codigo_concepto = 'IVSS'
+                  AND pn.estado IN ('aprobada', 'procesada_patria')
+                  AND YEAR(pn.fecha_fin) = %s
+                ORDER BY pn.fecha_fin ASC;
+            """
+            cursor.execute(sql_ivss, (solicitud['trabajador_id'], solicitud['anio']))
+            detalles_raw = cursor.fetchall()
+
+            detalles = []
+            total_retenido = Decimal('0.00')
+            total_patrono = Decimal('0.00')
+            total_general = Decimal('0.00')
+            semanas_acumuladas = 0
+
+            for d in detalles_raw:
+                ret = Decimal(str(d['retencion_trabajador']))
+                pat = (ret * Decimal('2.25')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                tot = (ret * Decimal('3.25')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                semanas = 2 if int(d.get('dias_trabajados') or 15) <= 15 else 4
+                semanas_acumuladas += semanas
+
+                total_retenido += ret
+                total_patrono += pat
+                total_general += tot
+
+                detalles.append({
+                    'descripcion': d['descripcion'],
+                    'fecha_inicio': d['fecha_inicio'],
+                    'fecha_fin': d['fecha_fin'],
+                    'semanas': semanas,
+                    'retencion_trabajador': ret,
+                    'aporte_patronal': pat,
+                    'total_depositado': tot
+                })
+
+            meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+            fecha_ref = solicitud['fecha_aprobacion'] or datetime.date.today()
+            fecha_texto = f"a los {fecha_ref.day} días del mes de {meses[fecha_ref.month - 1]} de {fecha_ref.year}"
+
+            return render_template(
+                'portal/portal_ivss_imprimir.html',
+                s=solicitud,
+                t=solicitud,
+                detalles=detalles,
+                total_retenido=total_retenido,
+                total_patrono=total_patrono,
+                total_general=total_general,
+                total_semanas=semanas_acumuladas,
+                anio=solicitud['anio'],
+                fecha_texto=fecha_texto
+            )
+    finally:
+        conexion.close()
+        
+# -------------------------------------------------------------------------
+# JUBILACIONES: Solicitud y Consulta del Funcionario
+# -------------------------------------------------------------------------
+@portal_bp.route('/jubilacion', methods=['GET', 'POST'])
+def jubilacion():
+    if 'usuario_id' not in session or session.get('rol') != 'trabajador':
+        return redirect(url_for('auth.login'))
+
+    conexion = get_db_connection()
+    try:
+        with conexion.cursor() as cursor:
+            t_id = obtener_trabajador_id_actual(cursor)
+            cursor.execute("""
+                SELECT t.*, c.nombre AS cargo_nombre, d.nombre AS departamento_nombre
+                FROM trabajador t
+                INNER JOIN cargo c ON t.cargo_id = c.cargo_id
+                LEFT JOIN departamento d ON c.departamento_id = d.departamento_id
+                WHERE t.trabajador_id = %s;
+            """, (t_id,))
+            trabajador = cursor.fetchone()
+
+            hoy = datetime.date.today()
+            f_ing = trabajador['fecha_ingreso']
+            f_nac = trabajador['fecha_nacimiento']
+
+            anos_servicio = hoy.year - f_ing.year - ((hoy.month, hoy.day) < (f_ing.month, f_ing.day)) if f_ing else 0
+            edad = hoy.year - f_nac.year - ((hoy.month, hoy.day) < (f_nac.month, f_nac.day)) if f_nac else 0
+
+            cumple_edad = (trabajador['sexo'] == 'M' and edad >= 60) or (trabajador['sexo'] == 'F' and edad >= 55)
+            cumple_requisitos = anos_servicio >= 28 or (cumple_edad and anos_servicio >= 25)
+
+            if request.method == 'POST':
+                motivo = request.form.get('motivo', 'Solicitud formal de jubilación reglamentaria').strip()
+                cursor.execute("""
+                    INSERT INTO solicitud_jubilacion (
+                        trabajador_id, tipo_tramite, motivo, anos_servicio, edad_trabajador,
+                        fecha_solicitud, estado
+                    ) VALUES (%s, 'solicitud_voluntaria', %s, %s, %s, NOW(), 'solicitada');
+                """, (t_id, motivo, anos_servicio, edad))
+                conexion.commit()
+                flash('Solicitud de jubilación enviada a la Dirección de Recursos Humanos.', 'success')
+                return redirect(url_for('portal.jubilacion'))
+
+            cursor.execute("SELECT * FROM solicitud_jubilacion WHERE trabajador_id = %s ORDER BY jubilacion_id DESC;", (t_id,))
+            solicitudes = cursor.fetchall()
+
+            return render_template(
+                'portal/portal_jubilacion.html',
+                t=trabajador,
+                anos_servicio=anos_servicio,
+                edad=edad,
+                cumple=cumple_requisitos,
+                solicitudes=solicitudes
+            )
+    finally:
+        conexion.close()
+
+
+# -------------------------------------------------------------------------
+# RESOLUCIÓN OFICIAL DE JUBILACIÓN (Documento Legal Imprimible)
+# -------------------------------------------------------------------------
+@portal_bp.route('/jubilacion/imprimir/<int:jubilacion_id>')
+def imprimir_resolucion_jubilacion(jubilacion_id):
+    conexion = get_db_connection()
+    try:
+        with conexion.cursor() as cursor:
+            sql = """
+                SELECT sj.*, t.cedula, t.nombres, t.apellidos, t.fecha_ingreso,
+                       c.nombre AS cargo_nombre, d.nombre AS departamento_nombre
+                FROM solicitud_jubilacion sj
+                INNER JOIN trabajador t ON sj.trabajador_id = t.trabajador_id
+                INNER JOIN cargo c ON t.cargo_id = c.cargo_id
+                LEFT JOIN departamento d ON c.departamento_id = d.departamento_id
+                WHERE sj.jubilacion_id = %s;
+            """
+            cursor.execute(sql, (jubilacion_id,))
+            j = cursor.fetchone()
+
+            if not j or j['estado'] != 'aprobada':
+                flash('La resolución solicitada no existe o no ha sido aprobada.', 'warning')
+                return redirect(url_for('auth.dashboard'))
+
+            meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+            fecha_ref = j['fecha_resolucion'] or datetime.date.today()
+            fecha_texto = f"a los {fecha_ref.day} días del mes de {meses[fecha_ref.month - 1]} de {fecha_ref.year}"
+
+            return render_template('portal/portal_jubilacion_imprimir.html', j=j, fecha_texto=fecha_texto)
     finally:
         conexion.close()

@@ -28,6 +28,29 @@
             <a href="{{ url_for('nomina.recibos_lote', periodo_id=periodo.periodo_id) }}" target="_blank" class="btn btn-primary d-inline-flex align-items-center gap-1">
                 <span>🖨️</span> Imprimir Recibos (Lote)
             </a>
+
+            <!-- CONTROLES DINÁMICOS EN CABECERA -->
+            {% if session.get('rol') in ['directora_rrhh', 'analista_rrhh', 'tecnico_informatica'] %}
+                {% if periodo.estado == 'borrador' %}
+                    <form method="POST" action="{{ url_for('nomina.recalcular', periodo_id=periodo.periodo_id) }}" class="d-inline" onsubmit="return confirm('¿Recalcular esta nómina con los salarios y personal vigentes?');">
+                        <button type="submit" class="btn btn-outline-success d-inline-flex align-items-center gap-1">
+                            <span>🔄</span> Recalcular Nómina
+                        </button>
+                    </form>
+                {% else %}
+                    <form method="POST" action="{{ url_for('nomina.retroceder', periodo_id=periodo.periodo_id) }}" class="d-inline" onsubmit="return confirm('¿Reabrir esta nómina y retroceder a BORRADOR para poder recalcularla o corregir errores?');">
+                        <button type="submit" class="btn btn-outline-warning d-inline-flex align-items-center gap-1">
+                            <span>↩️</span> Retroceder a Borrador
+                        </button>
+                    </form>
+                {% endif %}
+
+                {% if session.get('rol') in ['directora_rrhh', 'tecnico_informatica'] or periodo.estado in ['borrador', 'rechazada'] %}
+                    <button type="button" class="btn btn-outline-danger d-inline-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#modalEliminarPeriodo">
+                        <span>🗑️</span> Eliminar Nómina
+                    </button>
+                {% endif %}
+            {% endif %}
         </div>
     </div>
 </div>
@@ -76,47 +99,84 @@
             <span>Aprobada por: <strong>{{ periodo.presidente_nom or ('Elena Perez (Visto Bueno)' if periodo.estado in ['aprobada', 'procesada_patria'] else 'Pendiente') }}</strong></span>
         </div>
 
-        <!-- MÓDULO DE DECISIÓN PARA LA DIRECTORA DE RRHH -->
-        {% if session.get('rol') == 'directora_rrhh' %}
+        <!-- MÓDULO DE DECISIÓN Y FLUJO COMPLETO -->
+        {% if session.get('rol') in ['directora_rrhh', 'analista_rrhh', 'tecnico_informatica'] %}
             
-            <!-- Si está en BORRADOR: Validar Nómina -->
+            <!-- Si está en BORRADOR -->
             {% if periodo.estado == 'borrador' %}
-            <div class="alert alert-warning mt-3 mb-0 d-flex justify-content-between align-items-center">
+            <div class="alert alert-warning mt-3 mb-0 d-flex flex-wrap justify-content-between align-items-center gap-2">
                 <div>
-                    <strong>Paso 1: Validación de Recursos Humanos.</strong> Compruebe los cálculos antes de emitir la sábana física a Presidencia.
+                    <strong>Paso 1: Validación de Recursos Humanos.</strong> Compruebe los cálculos antes de remitir a Presidencia. Puede recalcular si hubo cambios salariales o de personal.
                 </div>
-                <form method="POST" action="{{ url_for('nomina.revisar', periodo_id=periodo.periodo_id) }}">
-                    <button type="submit" name="accion" value="validar" class="btn btn-warning fw-bold">
-                        ✓ Validar Nómina (Paso a Firma)
-                    </button>
-                </form>
+                <div class="d-flex gap-2">
+                    <form method="POST" action="{{ url_for('nomina.recalcular', periodo_id=periodo.periodo_id) }}" onsubmit="return confirm('¿Recalcular todos los montos de esta pre-nómina?');">
+                        <button type="submit" class="btn btn-outline-dark fw-bold">
+                            🔄 Recalcular
+                        </button>
+                    </form>
+                    {% if session.get('rol') == 'directora_rrhh' %}
+                    <form method="POST" action="{{ url_for('nomina.revisar', periodo_id=periodo.periodo_id) }}">
+                        <button type="submit" name="accion" value="validar" class="btn btn-warning fw-bold">
+                            ✓ Validar Nómina (Paso a Firma)
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
             </div>
             {% endif %}
 
-            <!-- Si está REVISADA: Registrar Aprobación Oficial mediante Modal -->
+            <!-- Si está REVISADA -->
             {% if periodo.estado == 'revisada' %}
-            <div class="alert alert-info mt-3 mb-0 d-flex justify-content-between align-items-center">
+            <div class="alert alert-info mt-3 mb-0 d-flex flex-wrap justify-content-between align-items-center gap-2">
                 <div>
                     <h4 class="alert-title mb-1">🏛️ Paso 2: Registro de Conformidad de Presidencia</h4>
                     <div class="text-muted small">
-                        Si ya cuenta con la sábana física firmada y sellada por el Presidente del Concejo, proceda a aprobar la nómina para habilitar la entrega de recibos y exportación a Patria.
+                        Si ya cuenta con la sábana física firmada por el Presidente del Concejo, proceda a registrar la aprobación oficial. Si hay objeciones, puede retroceder a borrador.
                     </div>
                 </div>
-                <button type="button" class="btn btn-success fw-bold d-inline-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#modalAprobarNomina">
-                    <span>🔒</span> Registrar Aprobación Oficial
-                </button>
+                <div class="d-flex gap-2">
+                    <form method="POST" action="{{ url_for('nomina.retroceder', periodo_id=periodo.periodo_id) }}" onsubmit="return confirm('¿Devolver esta nómina a estado BORRADOR para correcciones?');">
+                        <button type="submit" class="btn btn-outline-warning fw-bold">
+                            ↩️ Devolver a Borrador
+                        </button>
+                    </form>
+                    <button type="button" class="btn btn-success fw-bold d-inline-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#modalAprobarNomina">
+                        <span>🔒</span> Registrar Aprobación Oficial
+                    </button>
+                </div>
             </div>
             {% endif %}
 
-            <!-- Si está APROBADA: Botón para descargar archivo TXT Patria -->
+            <!-- Si está APROBADA o PROCESADA PATRIA -->
             {% if periodo.estado in ['aprobada', 'procesada_patria'] %}
-            <div class="alert alert-success mt-3 mb-0 d-flex justify-content-between align-items-center">
+            <div class="alert alert-success mt-3 mb-0 d-flex flex-wrap justify-content-between align-items-center gap-2">
                 <div>
                     <strong class="text-success">✓ Nómina aprobada institucionalmente.</strong> Lista para dispersión bancaria y Sistema Patria.
                 </div>
-                <a href="{{ url_for('nomina.exportar_patria', periodo_id=periodo.periodo_id) }}" class="btn btn-dark fw-bold">
-                    📥 Descargar Archivo TXT Patria
-                </a>
+                <div class="d-flex gap-2">
+                    <form method="POST" action="{{ url_for('nomina.retroceder', periodo_id=periodo.periodo_id) }}" onsubmit="return confirm('¿ATENCIÓN: Desea reabrir esta nómina aprobada y retroceder a BORRADOR para recalcularla o anularla?');">
+                        <button type="submit" class="btn btn-outline-warning fw-bold">
+                            ↩️ Reabrir / Retroceder a Borrador
+                        </button>
+                    </form>
+                    <a href="{{ url_for('nomina.exportar_patria', periodo_id=periodo.periodo_id) }}" class="btn btn-dark fw-bold">
+                        📥 Descargar Archivo TXT Patria
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Si está RECHAZADA -->
+            {% if periodo.estado == 'rechazada' %}
+            <div class="alert alert-danger mt-3 mb-0 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div>
+                    <strong class="text-danger">⚠️ Nómina Rechazada:</strong> {{ periodo.observaciones_rechazo or 'Requiere ajustes técnicos.' }}
+                </div>
+                <form method="POST" action="{{ url_for('nomina.retroceder', periodo_id=periodo.periodo_id) }}">
+                    <button type="submit" class="btn btn-warning fw-bold">
+                        ↩️ Reabrir a Borrador para Corregir y Recalcular
+                    </button>
+                </form>
             </div>
             {% endif %}
 
@@ -181,9 +241,7 @@
     </div>
 </div>
 
-<!-- ========================================== -->
-<!-- 1. MODAL: REGISTRAR APROBACIÓN DE NÓMINA -->
-<!-- ========================================== -->
+<!-- MODAL: REGISTRAR APROBACIÓN DE NÓMINA -->
 <div class="modal modal-blur fade" id="modalAprobarNomina" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" role="document">
         <form method="POST" action="{{ url_for('nomina.aprobar', periodo_id=periodo.periodo_id) }}" class="modal-content">
@@ -196,7 +254,7 @@
                     ¿Confirma que la <strong>sábana física del Periodo #{{ periodo.periodo_id }}</strong> cuenta con la firma y sello de Presidencia?
                 </div>
                 <div class="alert alert-info mt-3 text-start small">
-                    Al confirmar, el periodo quedará <strong>bloqueado contra modificaciones</strong>, se habilitará la descarga del archivo Patria y los recibos de pago estarán formalmente certificados bajo el Art. 106 LOTTT.
+                    Al confirmar, el periodo quedará formalmente aprobado, se habilitará la exportación a Patria y los recibos de pago estarán formalmente certificados bajo el Art. 106 LOTTT.
                 </div>
             </div>
             <div class="modal-footer">
@@ -211,9 +269,31 @@
     </div>
 </div>
 
-<!-- ========================================== -->
-<!-- 2. MODAL: VISUALIZAR SÁBANA CONSOLIDADA -->
-<!-- ========================================== -->
+<!-- MODAL: ELIMINAR NÓMINA DEFINITIVAMENTE -->
+<div class="modal modal-blur fade" id="modalEliminarPeriodo" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <form method="POST" action="{{ url_for('nomina.eliminar', periodo_id=periodo.periodo_id) }}" class="modal-content text-center">
+            <div class="modal-status bg-danger"></div>
+            <div class="modal-body py-4">
+                <span class="avatar avatar-xl bg-danger-lt text-danger mb-3">🗑️</span>
+                <h3>¿Eliminar este Período?</h3>
+                <div class="text-muted">
+                    Se eliminará permanentemente el <strong>Período #{{ periodo.periodo_id }}</strong> y todos sus cálculos contables asociados.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="w-100">
+                    <div class="row">
+                        <div class="col"><button type="button" class="btn w-100" data-bs-dismiss="modal">Cancelar</button></div>
+                        <div class="col"><button type="submit" class="btn btn-danger w-100 fw-bold">Sí, Eliminar</button></div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL: VISUALIZAR SÁBANA CONSOLIDADA -->
 <div class="modal modal-blur fade" id="modalSabana" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-fullscreen" role="document">
         <div class="modal-content">

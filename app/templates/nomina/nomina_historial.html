@@ -87,9 +87,27 @@
                             <a href="{{ url_for('nomina.reporte_consolidado', periodo_id=p.periodo_id) }}" target="_blank" class="btn btn-sm btn-outline-secondary" title="Sábana Consolidada">
                                 📊 Sábana
                             </a>
-                            {% if p.estado in ['borrador', 'rechazada'] %}
-                            <form method="POST" action="{{ url_for('nomina.eliminar', periodo_id=p.periodo_id) }}" class="d-inline" onsubmit="return confirm('¿Eliminar este borrador de pre-nómina?');">
-                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar Borrador">
+                            {% if p.estado == 'borrador' and session.get('rol') in ['directora_rrhh', 'analista_rrhh'] %}
+                            <form method="POST" action="{{ url_for('nomina.recalcular', periodo_id=p.periodo_id) }}" class="d-inline" onsubmit="return confirm('¿Recalcular esta nómina con la plantilla y salarios actuales?');">
+                                <button type="submit" class="btn btn-sm btn-outline-success" title="Recalcular Importes">
+                                    🔄
+                                </button>
+                            </form>
+                            {% endif %}
+
+                            <!-- Botón de Retroceder a Borrador (Si está aprobada, revisada o rechazada) -->
+                            {% if p.estado != 'borrador' and session.get('rol') in ['directora_rrhh', 'analista_rrhh'] %}
+                            <form method="POST" action="{{ url_for('nomina.retroceder', periodo_id=p.periodo_id) }}" class="d-inline" onsubmit="return confirm('¿Reabrir esta nómina a estado BORRADOR para poder recalcularla o corregirla?');">
+                                <button type="submit" class="btn btn-sm btn-outline-warning" title="Reabrir / Retroceder a Borrador">
+                                    ↩️
+                                </button>
+                            </form>
+                            {% endif %}
+
+                            <!-- Botón Eliminar: La Directora puede eliminar cualquier nómina (incluidas las de prueba) -->
+                            {% if session.get('rol') in ['directora_rrhh', 'tecnico_informatica'] or p.estado in ['borrador', 'rechazada'] %}
+                            <form method="POST" action="{{ url_for('nomina.eliminar', periodo_id=p.periodo_id) }}" class="d-inline" onsubmit="return confirm('¿Eliminar definitivamente este período de nómina y todos sus registros contables?');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar Nómina">
                                     🗑️
                                 </button>
                             </form>
