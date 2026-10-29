@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}Bandeja de Jubilaciones y Pensiones - RRHH{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none mb-4">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="text-muted small text-uppercase fw-bold">Régimen de Previsión y Retiro</div>
+            <h2 class="page-title text-dark">
+                📜 Resoluciones y Solicitudes de Jubilación
+            </h2>
+            <div class="text-muted mt-1">
+                Concejo Municipal de Independencia · Emisión de Decretos de Retiro y concesión de pensión (Leyes Sociales Art. 105 LOTTT).
+            </div>
+        </div>
+        <div class="col-auto ms-auto d-flex gap-2">
+            <button type="button" class="btn btn-primary d-inline-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#modalJubilacionDirecta">
+                <span>➕</span> Emitir Resolución de Jubilación (Oficio)
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-light py-3">
+        <h3 class="card-title text-dark mb-0">Expedientes de Retiro Registrados</h3>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-hover">
+            <thead>
+                <tr>
+                    <th>Resolución</th>
+                    <th>Funcionario</th>
+                    <th>C.I.</th>
+                    <th>Antigüedad / Edad</th>
+                    <th>Pensión (% y Monto)</th>
+                    <th>Modalidad</th>
+                    <th class="text-center">Estatus</th>
+                    <th class="text-center">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in solicitudes %}
+                <tr>
+                    <td class="font-monospace fw-bold text-primary">{{ s.correlativo or '—' }}</td>
+                    <td class="fw-bold text-dark">{{ s.nombres }} {{ s.apellidos }}</td>
+                    <td class="font-monospace">V-{{ s.cedula }}</td>
+                    <td>
+                        <div>{{ s.anos_servicio }} años de servicio</div>
+                        <div class="text-muted small">{{ s.edad_trabajador }} años de edad</div>
+                    </td>
+                    <td>
+                        <span class="badge bg-green-lt fw-bold">{{ s.porcentaje_jubilacion }}%</span>
+                        <div class="font-monospace fw-bold text-success mt-1">Bs. {{ "{:,.2f}".format(s.monto_pension|float) }}</div>
+                    </td>
+                    <td class="text-capitalize small text-muted">{{ s.tipo_tramite|replace('_', ' ') }}</td>
+                    <td class="text-center">
+                        {% if s.estado == 'aprobada' %}
+                            <span class="badge bg-success-lt">Jubilado(a) Oficial</span>
+                        {% elif s.estado == 'rechazada' %}
+                            <span class="badge bg-danger-lt">Rechazada</span>
+                        {% else %}
+                            <span class="badge bg-warning-lt">Solicitud en Trámite</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if s.estado == 'aprobada' %}
+                        <a href="{{ url_for('portal.imprimir_resolucion_jubilacion', jubilacion_id=s.jubilacion_id) }}" target="_blank" class="btn btn-sm btn-outline-dark">
+                            🖨️ Ver Resolución
+                        </a>
+                        {% elif s.estado == 'solicitada' %}
+                        <button type="button" class="btn btn-sm btn-success fw-bold" data-bs-toggle="modal" data-bs-target="#modalAprobar{{ s.jubilacion_id }}">
+                            ✓ Conceder
+                        </button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="text-center text-muted py-4">No hay expedientes de jubilación tramitados.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal: Emisión Directa de Oficio por RRHH -->
+<div class="modal modal-blur fade" id="modalJubilacionDirecta" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="POST" action="{{ url_for('trabajadores.crear_jubilacion_directa') }}" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">Emitir Resolución Administrativa de Jubilación</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Funcionario a Jubilar:</label>
+                    <select name="trabajador_id" class="form-select" required>
+                        <option value="" disabled selected>Seleccione el trabajador...</option>
+                        {% for t in trabajadores %}
+                            <option value="{{ t.trabajador_id }}">V-{{ t.cedula }} · {{ t.nombres }} {{ t.apellidos }} ({{ t.cargo_nombre }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label fw-bold">Porcentaje Concedido (%):</label>
+                        <select name="porcentaje_jubilacion" class="form-select" required>
+                            <option value="100.00" selected>100% (Jubilación Completa)</option>
+                            <option value="90.00">90% (28 a 29 años)</option>
+                            <option value="80.00">80% (25 a 27 años)</option>
+                            <option value="70.00">70% (20 a 24 años)</option>
+                            <option value="60.00">60% (15 a 19 años)</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold">N° Resolución / Gaceta:</label>
+                        <input type="text" name="numero_gaceta_resolucion" class="form-control" placeholder="Ej: CMI-RES-2026-015" required>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Motivo y Fundamento Legal:</label>
+                    <textarea name="motivo" class="form-control" rows="2" required>Pase a retiro reglamentario conforme al Estatuto de Jubilaciones de la Función Pública y LOTTT.</textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-primary fw-bold">Aprobar y Emitir Resolución</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

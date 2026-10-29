@@ -14,7 +14,6 @@
                 Concejo Municipal de Independencia · Ajuste simultáneo de primas de tabulador y retenciones parafiscales de ley.
             </div>
         </div>
-        <!-- NUEVO BOTÓN PARA CREAR CONCEPTOS -->
         <div class="col-auto ms-auto d-flex gap-2">
             <button type="button" class="btn btn-primary d-inline-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#modalNuevoConcepto">
                 <span>➕</span> Nuevo Concepto / Retención
@@ -39,9 +38,10 @@
                                 <tr>
                                     <th class="w-1 text-center" title="Activo en nómina">Act.</th>
                                     <th>Concepto</th>
-                                    <th style="width: 120px;">Modalidad</th>
-                                    <th class="text-center" style="width: 100px;">Vigente</th>
-                                    <th class="text-end" style="width: 120px;">Nuevo Parámetro</th>
+                                    <th style="width: 110px;">Modalidad</th>
+                                    <th class="text-center" style="width: 90px;">Vigente</th>
+                                    <th class="text-end" style="width: 110px;">Nuevo Valor</th>
+                                    <th class="w-1 text-center">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -58,8 +58,8 @@
                                     <td>
                                         <select name="tipo_calculo[]" class="form-select form-select-sm select-modalidad">
                                             <option value="porcentaje" {% if a.tipo_calculo_display == 'porcentaje' %}selected{% endif %}>% Porcentaje</option>
-                                            <option value="monto_fijo" {% if a.tipo_calculo_display == 'monto_fijo' %}selected{% endif %}>Bs. Fijo</option>
-                                            <option value="dias" {% if a.tipo_calculo_display == 'dias' %}selected{% endif %}>Días</option>
+                                            <option value="fijo" {% if a.tipo_calculo_display in ['fijo', 'monto_fijo'] %}selected{% endif %}>Bs. Fijo</option>
+                                            <option value="formula" {% if a.tipo_calculo_display == 'formula' %}selected{% endif %}>Fórmula</option>
                                         </select>
                                     </td>
                                     <td class="text-center">
@@ -77,10 +77,22 @@
                                                placeholder="0"
                                                required>
                                     </td>
+                                    <td class="text-center">
+                                        <div class="d-flex gap-1 justify-content-center">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" title="Modificar Parámetros Completos" data-bs-toggle="modal" data-bs-target="#modalEditarConcepto{{ a.concepto_id }}">
+                                                ✏️
+                                            </button>
+                                            {% if a.codigo not in ['SUELDO', 'CESTATICKET', 'BONO_EXTRA'] %}
+                                            <button type="button" class="btn btn-sm btn-outline-danger" title="Eliminar Concepto" data-bs-toggle="modal" data-bs-target="#modalEliminarConcepto{{ a.concepto_id }}">
+                                                🗑️
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
                                 </tr>
                                 {% else %}
                                 <tr>
-                                    <td colspan="5" class="text-center text-muted py-3">No hay asignaciones registradas.</td>
+                                    <td colspan="6" class="text-center text-muted py-3">No hay asignaciones registradas.</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -104,9 +116,10 @@
                                 <tr>
                                     <th class="w-1 text-center" title="Activo en nómina">Act.</th>
                                     <th>Concepto</th>
-                                    <th style="width: 120px;">Modalidad</th>
-                                    <th class="text-center" style="width: 100px;">Vigente</th>
-                                    <th class="text-end" style="width: 120px;">Nuevo Parámetro</th>
+                                    <th style="width: 110px;">Modalidad</th>
+                                    <th class="text-center" style="width: 90px;">Vigente</th>
+                                    <th class="text-end" style="width: 110px;">Nuevo Valor</th>
+                                    <th class="w-1 text-center">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -123,7 +136,8 @@
                                     <td>
                                         <select name="tipo_calculo[]" class="form-select form-select-sm select-modalidad">
                                             <option value="porcentaje" {% if d.tipo_calculo_display == 'porcentaje' %}selected{% endif %}>% Porcentaje</option>
-                                            <option value="monto_fijo" {% if d.tipo_calculo_display == 'monto_fijo' %}selected{% endif %}>Bs. Fijo</option>
+                                            <option value="fijo" {% if d.tipo_calculo_display in ['fijo', 'monto_fijo'] %}selected{% endif %}>Bs. Fijo</option>
+                                            <option value="formula" {% if d.tipo_calculo_display == 'formula' %}selected{% endif %}>Fórmula</option>
                                         </select>
                                     </td>
                                     <td class="text-center">
@@ -141,10 +155,22 @@
                                                placeholder="0"
                                                required>
                                     </td>
+                                    <td class="text-center">
+                                        <div class="d-flex gap-1 justify-content-center">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" title="Modificar Parámetros Completos" data-bs-toggle="modal" data-bs-target="#modalEditarConcepto{{ d.concepto_id }}">
+                                                ✏️
+                                            </button>
+                                            {% if d.codigo not in ['IVSS', 'FAOV', 'RPE', 'FONDO_JUB'] %}
+                                            <button type="button" class="btn btn-sm btn-outline-danger" title="Eliminar Concepto" data-bs-toggle="modal" data-bs-target="#modalEliminarConcepto{{ d.concepto_id }}">
+                                                🗑️
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
                                 </tr>
                                 {% else %}
                                 <tr>
-                                    <td colspan="5" class="text-center text-muted py-3">No hay deducciones registradas.</td>
+                                    <td colspan="6" class="text-center text-muted py-3">No hay deducciones registradas.</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -155,7 +181,7 @@
         </div>
     </div>
 
-    <!-- Barra Inferior de Acción y Guardado -->
+    <!-- Barra Inferior de Guardado en Bloque -->
     <div class="card card-body bg-light mt-4 border shadow-sm d-flex flex-row justify-content-between align-items-center">
         <div>
             <span class="fw-bold text-dark">¿Desea aplicar estos ajustes a las próximas emisiones?</span>
@@ -175,12 +201,12 @@
         <form method="POST" action="{{ url_for('config.crear_concepto') }}" class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title fw-bold">Registrar Nuevo Concepto o Deducción</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3">
-                    <label class="form-label fw-bold">Código Interno (Ej: CESTATICKET, CAJA_AHORRO):</label>
-                    <input type="text" name="codigo" class="form-control font-uppercase" placeholder="EJ: PRIMA_TRANSPORTE" required>
+                    <label class="form-label fw-bold">Código Interno (Ej: PRIMA_TRANSPORTE, CAJA_AHORRO):</label>
+                    <input type="text" name="codigo" class="form-control text-uppercase" placeholder="EJ: PRIMA_TRANSPORTE" required>
                 </div>
                 <div class="mb-3">
                     <label class="form-label fw-bold">Nombre del Concepto:</label>
@@ -220,11 +246,104 @@
         </form>
     </div>
 </div>
+
+<!-- ======================================================== -->
+<!-- MODALES DE EDICIÓN INDIVIDUAL Y ELIMINACIÓN DE CONCEPTOS -->
+<!-- ======================================================== -->
+{% for c in asignaciones + deducciones %}
+
+<!-- Modal Modificar Parámetros Completos -->
+<div class="modal modal-blur fade" id="modalEditarConcepto{{ c.concepto_id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="POST" action="{{ url_for('config.editar_concepto', id=c.concepto_id) }}" class="modal-content text-start">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">✏️ Modificar Concepto: {{ c.codigo }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Nombre del Concepto:</label>
+                    <input type="text" name="nombre" class="form-control" value="{{ c.nombre }}" required>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label fw-bold">Modalidad / Método:</label>
+                        <select name="metodo" class="form-select" required>
+                            <option value="porcentaje" {% if c.metodo == 'porcentaje' %}selected{% endif %}>% Porcentaje</option>
+                            <option value="fijo" {% if c.metodo in ['fijo', 'monto_fijo'] %}selected{% endif %}>Bs. Fijo</option>
+                            <option value="formula" {% if c.metodo == 'formula' %}selected{% endif %}>Fórmula ONAPRE</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold">Valor / Parámetro:</label>
+                        <input type="number" step="any" name="valor" class="form-control font-monospace" value="{{ c.valor_limpio }}" required>
+                    </div>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label fw-bold">Base de Cálculo:</label>
+                        <select name="base_calculo" class="form-select">
+                            <option value="sueldo_base" {% if c.base_calculo == 'sueldo_base' %}selected{% endif %}>Sueldo Base Quincenal</option>
+                            <option value="salario_normal" {% if c.base_calculo == 'salario_normal' %}selected{% endif %}>Salario Normal</option>
+                            <option value="salario_integral" {% if c.base_calculo == 'salario_integral' %}selected{% endif %}>Salario Integral</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold">Fundamento Legal:</label>
+                        <input type="text" name="fundamento" class="form-control" value="{{ c.fundamento or '' }}" placeholder="LOTTT / ONAPRE">
+                    </div>
+                </div>
+                <div class="mb-2">
+                    <label class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" name="obligatorio" value="1" {% if c.obligatorio %}checked{% endif %}>
+                        <span class="form-check-label fw-bold">Aplicar a toda la plantilla por ley</span>
+                    </label>
+                    <label class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="activo" value="1" {% if c.activo %}checked{% endif %}>
+                        <span class="form-check-label fw-bold">Concepto Activo en Pre-nóminas</span>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-primary fw-bold">Guardar Modificaciones</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Eliminar Concepto -->
+{% if c.codigo not in ['SUELDO', 'CESTATICKET', 'IVSS', 'FAOV', 'RPE', 'FONDO_JUB', 'BONO_EXTRA'] %}
+<div class="modal modal-blur fade" id="modalEliminarConcepto{{ c.concepto_id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <form method="POST" action="{{ url_for('config.eliminar_concepto', id=c.concepto_id) }}" class="modal-content text-center">
+            <div class="modal-status bg-danger"></div>
+            <div class="modal-body py-4">
+                <span class="avatar avatar-xl bg-danger-lt text-danger mb-3">🗑️</span>
+                <h3>¿Eliminar {{ c.codigo }}?</h3>
+                <div class="text-muted small">
+                    ¿Confirmas eliminar definitivamente <strong>{{ c.nombre }}</strong>? Si ya forma parte de recibos pasados se desactivará automáticamente para proteger la auditoría legal.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="w-100">
+                    <div class="row">
+                        <div class="col"><button type="button" class="btn w-100" data-bs-dismiss="modal">Cancelar</button></div>
+                        <div class="col"><button type="submit" class="btn btn-danger w-100 fw-bold">Sí, Eliminar</button></div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+{% endfor %}
+
 {% endblock %}
 
 {% block scripts %}
 <script>
-    // Detección de cambios en tiempo real para feedback visual
     document.querySelectorAll('.input-valor').forEach(input => {
         input.addEventListener('input', function() {
             const original = parseFloat(this.getAttribute('data-original')) || 0;

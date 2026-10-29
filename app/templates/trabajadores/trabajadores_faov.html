@@ -18,6 +18,9 @@
             <a href="{{ url_for('trabajadores.listar') }}" class="btn btn-outline-secondary">
                 ← Volver al Directorio
             </a>
+            <button type="button" class="btn btn-primary d-inline-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#modalFaovDirecto">
+                <span>➕</span> Emitir Certificación FAOV (Oficio)
+            </button>
         </div>
     </div>
 </div>
@@ -112,6 +115,45 @@
                 {% endfor %}
             </tbody>
         </table>
+    </div>
+</div>
+
+<!-- MODAL: EMISIÓN DIRECTA DE CERTIFICACIÓN FAOV POR RRHH -->
+<div class="modal modal-blur fade" id="modalFaovDirecto" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="POST" action="{{ url_for('trabajadores.crear_faov_directo') }}" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">Emitir Certificación FAOV (Oficio RRHH)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Funcionario:</label>
+                    <select name="trabajador_id" class="form-select" required>
+                        <option value="" disabled selected>Seleccione el trabajador...</option>
+                        {% for t in trabajadores|default([]) %}
+                            <option value="{{ t.trabajador_id }}">V-{{ t.cedula }} · {{ t.nombres }} {{ t.apellidos }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Año Fiscal a Certificar:</label>
+                    <select name="anio" class="form-select" required>
+                        <option value="2026" selected>2026</option>
+                        <option value="2025">2025</option>
+                        <option value="2024">2024</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Motivo o Destino del Documento:</label>
+                    <input type="text" name="motivo" class="form-control" value="Trámite Habitacional / Solicitud Crédito BANAVIH" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-primary fw-bold">Generar Certificación Oficial</button>
+            </div>
+        </form>
     </div>
 </div>
 {% endblock %}

@@ -18,6 +18,9 @@
             <a href="{{ url_for('trabajadores.listar') }}" class="btn btn-outline-secondary">
                 ← Volver al Directorio
             </a>
+            <button type="button" class="btn btn-primary d-inline-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#modalConstanciaDirecta">
+                <span>➕</span> Emitir Constancia Directa
+            </button>
         </div>
     </div>
 </div>
@@ -161,6 +164,48 @@
                 {% endfor %}
             </tbody>
         </table>
+    </div>
+</div>
+
+<!-- 3. MODAL: EMISIÓN DIRECTA DE OFICIO POR RRHH -->
+<div class="modal modal-blur fade" id="modalConstanciaDirecta" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="POST" action="{{ url_for('trabajadores.crear_constancia_directa') }}" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">Emitir Constancia de Trabajo (Oficio RRHH)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Funcionario:</label>
+                    <select name="trabajador_id" class="form-select" required>
+                        <option value="" disabled selected>Seleccione el trabajador...</option>
+                        {% for t in trabajadores|default([]) %}
+                            <option value="{{ t.trabajador_id }}">V-{{ t.cedula }} · {{ t.nombres }} {{ t.apellidos }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Tipo de Constancia:</label>
+                    <select name="tipo" class="form-select" required>
+                        <option value="con_sueldo" selected>Con Salario Base Mensual</option>
+                        <option value="sin_sueldo">Sin Salario (Solo Antigüedad y Cargo)</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Destinatario:</label>
+                    <input type="text" name="destinatario" class="form-control" value="A QUIEN PUEDA INTERESAR" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Motivo o Trámite:</label>
+                    <input type="text" name="motivo" class="form-control" placeholder="Trámite Bancario / Embajada / Gestión Personal" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-primary fw-bold">Emitir y Generar Correlativo</button>
+            </div>
+        </form>
     </div>
 </div>
 {% endblock %}

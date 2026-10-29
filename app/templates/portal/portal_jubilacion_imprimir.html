@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Resolución de Jubilación - {{ j.correlativo }}</title>
+    <style>
+        body { font-family: 'Times New Roman', serif; font-size: 11.5pt; color: #111; margin: 40px; line-height: 1.5; }
+        .header { text-align: center; border-bottom: 2px solid #222; padding-bottom: 8px; margin-bottom: 25px; }
+        .header h3 { margin: 0; font-size: 12.5pt; text-transform: uppercase; }
+        .header h4 { margin: 3px 0; font-size: 11pt; font-weight: normal; }
+        .correlativo { text-align: right; font-weight: bold; margin-bottom: 20px; }
+        .titulo { text-align: center; font-size: 13.5pt; font-weight: bold; text-decoration: underline; margin-bottom: 25px; text-transform: uppercase; }
+        p { text-align: justify; margin-bottom: 14px; text-indent: 30px; }
+        .firmas { margin-top: 70px; display: flex; justify-content: space-around; text-align: center; }
+        .caja-firma { width: 280px; border-top: 1px solid #000; padding-top: 5px; }
+        @media print { .no-print { display: none; } body { margin: 0; } }
+    </style>
+</head>
+<body>
+    <div class="no-print" style="margin-bottom: 20px; text-align: right;">
+        <button onclick="window.print()" style="padding: 9px 18px; background: #0f172a; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+            🖨️ Imprimir Resolución Oficial
+        </button>
+    </div>
+
+    <div class="header">
+        <h3>República Bolivariana de Venezuela</h3>
+        <h4>Estado Yaracuy · Municipio Independencia</h4>
+        <h3>Concejo Municipal de Independencia</h3>
+        <h4>Dirección de Talento Humano</h4>
+        <div style="font-size: 9pt; margin-top: 4px;">RIF: G-20000153-0</div>
+    </div>
+
+    <div class="correlativo">RESOLUCIÓN N°: {{ j.correlativo }}</div>
+
+    <div class="titulo">Resolución de Concesión de Jubilación</div>
+
+    <p>
+        El <strong>Concejo Municipal de Independencia del Estado Yaracuy</strong>, en uso de las atribuciones legales conferidas en la Ley Orgánica del Poder Público Municipal, la Ley del Estatuto de la Función Pública y la Ley del Estatuto sobre el Régimen de Jubilaciones y Pensiones de los Funcionarios de la Administración Pública Nacional, Estadal y Municipal:
+    </p>
+
+    <p style="text-align: center; font-weight: bold; text-indent: 0; font-size: 12.5pt;">RESUELVE:</p>
+
+    <p>
+        <strong>ARTÍCULO PRIMERO:</strong> Conceder el beneficio de <strong>JUBILACIÓN REGLAMENTARIA</strong> al ciudadano(a) <strong>{{ j.nombres }} {{ j.apellidos }}</strong>, titular de la Cédula de Identidad N° <strong>V-{{ j.cedula }}</strong>, quien prestó servicios ininterrumpidos en esta entidad municipal desempeñando el cargo de <strong>{{ j.cargo_nombre }}</strong> adscrito(a) a la <strong>{{ j.departamento_nombre }}</strong>, habiendo acumulado un tiempo efectivo de servicio de <strong>{{ j.anos_servicio }} años</strong> y contando a la presente fecha con <strong>{{ j.edad_trabajador }} años de edad</strong>.
+    </p>
+
+    <p>
+        <strong>ARTÍCULO SEGUNDO:</strong> Fijar la asignación de su pensión mensual de jubilación en un <strong>{{ j.porcentaje_jubilacion }}%</strong> sobre el sueldo de referencia de su escala salarial, correspondiendo a un importe mensual de <strong>Bolívares {{ "{:,.2f}".format(j.monto_pension|float) }} (Bs. {{ "{:,.2f}".format(j.monto_pension|float) }})</strong>, el cual será dispersado quincenalmente a través del padrón oficial de Jubilados y Pensionados del Concejo Municipal.
+    </p>
+
+    <p>
+        <strong>ARTÍCULO TERCERO:</strong> En estricta conformidad con el marco legal de previsión social (Art. 105 de la LOTTT), la pensión aquí conferida goza de exención total sobre retenciones del Seguro Social (IVSS), Fondo de Ahorro para la Vivienda (FAOV), Régimen Prestacional de Empleo (RPE) y Fondo de Jubilaciones.
+    </p>
+
+    <p>
+        Dada, firmada y sellada en el Salón de Sesiones del Concejo Municipal de Independencia, {{ fecha_texto }}.
+    </p>
+
+    <div class="firmas">
+        <div class="caja-firma">
+            <strong>Presidente del Concejo</strong><br>
+            Concejo Municipal de Independencia
+        </div>
+        <div class="caja-firma">
+            <strong>Lcda. Elena Pérez</strong><br>
+            Directora de Talento Humano
+        </div>
+    </div>
+</body>
+</html>

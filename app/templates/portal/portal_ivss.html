@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block title %}Cuenta Individual y Seguro Social (IVSS) - Portal del Trabajador{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none mb-4">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="text-muted small text-uppercase fw-bold">Seguridad Social y Previsión</div>
+            <h2 class="page-title text-dark">
+                🏥 Cuenta Individual y Cotizaciones IVSS
+            </h2>
+            <div class="text-muted mt-1">
+                Historial de cotizaciones, retenciones del 4% y aportes patronales al Instituto Venezolano de los Seguros Sociales.
+            </div>
+        </div>
+        <div class="col-auto ms-auto d-flex gap-2">
+            <!-- Selector de Año Fiscal -->
+            <form method="GET" action="{{ url_for('portal.ivss_estado_cuenta') }}" class="d-flex align-items-center gap-2">
+                <label class="form-label mb-0 fw-bold text-muted small">Ejercicio:</label>
+                <select name="anio" class="form-select form-select-sm" onchange="this.form.submit()">
+                    {% for a in anios %}
+                        <option value="{{ a }}" {% if a|string == anio_activo %}selected{% endif %}>{{ a }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+            <button type="button" class="btn btn-primary d-inline-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#modalSolicitarIvss">
+                <span>📄</span> Solicitar Certificación
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Tarjetas Métricas Resumen -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small fw-bold text-uppercase">Retención Funcionario (4%)</div>
+                <div class="h2 mb-0 font-monospace text-primary fw-bold">Bs. {{ "{:,.2f}".format(total_trabajador) }}</div>
+                <div class="text-muted small mt-1">Deducido de su nómina ordinaria</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small fw-bold text-uppercase">Aporte Concejo (9%)</div>
+                <div class="h2 mb-0 font-monospace text-success fw-bold">Bs. {{ "{:,.2f}".format(total_patronal) }}</div>
+                <div class="text-muted small mt-1">Aporte institucional (Riesgo Mínimo)</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small fw-bold text-uppercase">Total Depositado IVSS (13%)</div>
+                <div class="h2 mb-0 font-monospace text-dark fw-bold">Bs. {{ "{:,.2f}".format(gran_total_ivss) }}</div>
+                <div class="text-muted small mt-1">Fondo Consolidado de Pensiones</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm bg-blue-lt">
+            <div class="card-body">
+                <div class="text-muted small fw-bold text-uppercase">Semanas Cotizadas ({{ anio_activo }})</div>
+                <div class="h2 mb-0 font-monospace text-blue fw-bold">{{ total_semanas }} semanas</div>
+                <div class="text-muted small mt-1">Base para cómputo de pensión</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Desglose Quincenal de Movimientos -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-light py-3 d-flex justify-content-between align-items-center">
+        <h3 class="card-title text-dark mb-0">Cotizaciones Registradas en {{ anio_activo }}</h3>
+        <span class="badge bg-secondary-lt">{{ movimientos|length }} emisiones liquidadas</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-hover">
+            <thead>
+                <tr>
+                    <th>Período / Nómina</th>
+                    <th>Lapso Quincenal</th>
+                    <th class="text-center">Semanas</th>
+                    <th class="text-end">Retención (4%)</th>
+                    <th class="text-end">Aporte Patrono (9%)</th>
+                    <th class="text-end">Total Aportado (13%)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in movimientos %}
+                <tr>
+                    <td class="fw-bold text-dark">{{ m.periodo }}</td>
+                    <td class="text-muted font-monospace small">{{ m.fecha_inicio }} al {{ m.fecha_fin }}</td>
+                    <td class="text-center"><span class="badge bg-blue-lt font-monospace">+{{ m.semanas }} sem</span></td>
+                    <td class="text-end font-monospace text-primary">Bs. {{ "{:,.2f}".format(m.retencion_trabajador) }}</td>
+                    <td class="text-end font-monospace text-success">Bs. {{ "{:,.2f}".format(m.aporte_patronal) }}</td>
+                    <td class="text-end font-monospace fw-bold text-dark">Bs. {{ "{:,.2f}".format(m.total_depositado) }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">
+                        No se registran retenciones de Seguro Social para el año fiscal {{ anio_activo }}.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            {% if movimientos %}
+            <tfoot>
+                <tr class="table-light fw-bold">
+                    <td colspan="2">TOTAL EJERCICIO FISCAL {{ anio_activo }}</td>
+                    <td class="text-center text-blue font-monospace">{{ total_semanas }} sem</td>
+                    <td class="text-end font-monospace text-primary">Bs. {{ "{:,.2f}".format(total_trabajador) }}</td>
+                    <td class="text-end font-monospace text-success">Bs. {{ "{:,.2f}".format(total_patronal) }}</td>
+                    <td class="text-end font-monospace text-dark">Bs. {{ "{:,.2f}".format(gran_total_ivss) }}</td>
+                </tr>
+            </tfoot>
+            {% endif %}
+        </table>
+    </div>
+</div>
+
+<!-- Bandeja de Solicitudes de Certificación Emitidas -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-light py-3">
+        <h3 class="card-title text-dark mb-0">Mis Certificaciones y Solicitudes IVSS</h3>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-hover">
+            <thead>
+                <tr>
+                    <th>N° Trámite</th>
+                    <th>Año Fiscal</th>
+                    <th>Motivo Declarado</th>
+                    <th>Fecha Registro</th>
+                    <th class="text-center">Estatus</th>
+                    <th class="text-center">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in solicitudes %}
+                <tr>
+                    <td class="font-monospace text-muted">#{{ s.solicitud_ivss_id }}</td>
+                    <td class="fw-bold">{{ s.anio }}</td>
+                    <td class="text-muted small">{{ s.motivo or 'Trámite de Seguro Social' }}</td>
+                    <td class="text-muted small font-monospace">{{ s.fecha_solicitud }}</td>
+                    <td class="text-center">
+                        {% if s.estado == 'aprobada' %}
+                            <span class="badge bg-success-lt">Aprobada · {{ s.correlativo }}</span>
+                        {% elif s.estado == 'rechazada' %}
+                            <span class="badge bg-danger-lt">Rechazada</span>
+                        {% else %}
+                            <span class="badge bg-warning-lt">En Revisión RRHH</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if s.estado == 'aprobada' %}
+                        <a href="{{ url_for('portal.imprimir_constancia_ivss', solicitud_id=s.solicitud_ivss_id) }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                            🖨️ Descargar Certificación
+                        </a>
+                        {% else %}
+                        <span class="text-muted small">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-3">
+                        No has solicitado certificaciones de Seguro Social aún.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Solicitar Certificación -->
+<div class="modal modal-blur fade" id="modalSolicitarIvss" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="POST" action="{{ url_for('portal.ivss_estado_cuenta') }}" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">Solicitar Certificación de Cotizaciones IVSS</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Año Fiscal a Certificar:</label>
+                    <select name="anio_solicitud" class="form-select" required>
+                        {% for a in anios %}
+                            <option value="{{ a }}" {% if a|string == anio_activo %}selected{% endif %}>{{ a }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Motivo o Destino del Documento:</label>
+                    <input type="text" name="motivo" class="form-control" placeholder="Ej: Trámite de Pensión de Vejez / Actualización Cuenta Individual IVSS" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-primary fw-bold">Enviar Solicitud a RRHH</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
